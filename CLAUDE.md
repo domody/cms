@@ -1,47 +1,77 @@
-<laravel-boost-guidelines>
-# Laravel Application
+@AGENTS.md
 
-This repository contains a Laravel application. Complete the following setup before working on the user's request.
+# CMS Backend
 
-## Prerequisites
+## Hard Constraints
 
-Verify that PHP and Composer are available:
+**Git:**
+- Do not run, suggest, or simulate git commands.
+- All code changes via file diffs only — human commits.
 
-```sh
-php -v
-composer -V
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Laravel 13, PHP 8.4 |
+| Database | PostgreSQL (Docker locally) |
+| Admin | Filament 5 — panel at `/admin`, multi-tenant |
+| API Auth | Laravel Sanctum (token-based) |
+| Dev tooling | Laravel Boost (MCP, dev-only) |
+
+Headless CMS serving content to separate frontend codebases via the Sanctum-authenticated API. Full walkthrough of what's built and how to verify it: `README.md`.
+
+## Multi-tenancy (fail-closed)
+
+Read before touching auth, `User`, or adding models.
+
+- Every tenant-owned model uses `App\Models\Concerns\BelongsToTenant`, which registers `TenantScope` as a global scope.
+- **No authenticated user → zero rows, not everything.** Applies unconditionally, including to `User` — no model-level exception.
+
+**Pre-auth bypasses** (the only two — don't add more):
+
+| File | Purpose |
+|---|---|
+| `app/Auth/TenantUnscopedEloquentUserProvider.php` | `users` auth provider — login, password reset, remember-me |
+| `app/Models/PersonalAccessToken.php` | Sanctum's `tokenable()` resolution |
+
+If a new pre-auth lookup is ever genuinely needed, extend `tests/Feature/TenantScopingTest.php` first — it's mutation-tested against this exact class of regression (session-recursion bug details in README's tenancy section).
+
+**Adding a tenant-owned model:**
+
+```php
+class Page extends Model
+{
+    use \App\Models\Concerns\BelongsToTenant;
+}
 ```
 
-If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+Don't hand-write `tenant_id` scoping — the trait handles creating/updating enforcement and query scoping.
 
-macOS:
+**Verify:** `php artisan test --filter=TenantScopingTest`
 
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
+## Testing
+
+- No default testing — don't write tests unless explicitly asked.
+- Exception: any change to the tenancy/auth bypass logic above must extend and pass `TenantScopingTest`. That's a correctness requirement, not optional coverage.
+
+## Migrations
+
+New migrations: `YYYY_MM_DD_NNNNNN_<entity-or-feature>.php`, not Laravel's default `create_x_table` naming. Group related tables under one migration when they belong to the same entity/feature.
+
+Existing migrations (`0001_01_01_...`) predate this convention — leave them as-is.
+
+```php
+public function up(): void
+{
+    Schema::create('pages', fn (Blueprint $table) => /* ... */ null);
+    Schema::create('page_revisions', fn (Blueprint $table) => /* ... */ null);
+}
 ```
 
-Windows PowerShell:
+## Local Dev
 
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
+Postgres needs to be running manually:
+
+```bash
+docker start cms_backend_postgres   # if it isn't already running
 ```
-
-Linux:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
-```
-
-After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
-
-## Agent Setup
-
-Install Laravel Boost from the application root before making application changes:
-
-```sh
-composer require laravel/boost --dev
-php artisan boost:install
-```
-
-Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
-</laravel-boost-guidelines>

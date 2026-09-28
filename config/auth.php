@@ -63,7 +63,10 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // Custom driver (registered in AppServiceProvider): identical to
+            // 'eloquent', except its queries bypass TenantScope, since login
+            // and password reset must find a user before any tenant is known.
+            'driver' => 'tenant_unscoped_eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

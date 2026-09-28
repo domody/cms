@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -12,14 +13,32 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Creates two tenants with one user each, so tenant switching and
+     * tenant scoping can be verified locally out of the box.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $acme = Tenant::factory()->create([
+            'name' => 'Acme Corp',
+            'slug' => 'acme-corp',
+        ]);
+
+        $globex = Tenant::factory()->create([
+            'name' => 'Globex Inc',
+            'slug' => 'globex-inc',
+        ]);
 
         User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'tenant_id' => $acme->id,
+            'name' => 'Acme Admin',
+            'email' => 'admin@acme-corp.test',
+        ]);
+
+        User::factory()->create([
+            'tenant_id' => $globex->id,
+            'name' => 'Globex Admin',
+            'email' => 'admin@globex-inc.test',
         ]);
     }
 }

@@ -1,58 +1,147 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CMS Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Headless, multi-tenant CMS backend. Laravel + Filament admin panel + token-based API auth (Sanctum), serving content to separate React/Inertia frontend codebases. This is the **project skeleton only** — auth, tenancy, and Filament are wired up; no content models, Builder/Repeater fields, Filament resources, or public API endpoints exist yet.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel 13, PHP 8.4
+- PostgreSQL (via Docker locally)
+- [Filament 5](https://filamentphp.com) — admin panel at `/admin`, with multi-tenancy
+- [Laravel Sanctum](https://laravel.com/docs/sanctum) — API token auth for external frontends
+- [Laravel Boost](https://laravel.com/docs/boost) — AI agent tooling (dev-only)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Local setup
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. Start a Postgres container (already created for this project as `cms_backend_postgres`):
 
-## Learning Laravel
+   ```bash
+   docker start cms_backend_postgres
+   # first time only, if the container doesn't exist yet:
+   docker run -d --name cms_backend_postgres \
+     -e POSTGRES_DB=cms_backend -e POSTGRES_USER=cms_backend -e POSTGRES_PASSWORD=secret \
+     -p 5432:5432 -v cms_backend_pgdata:/var/lib/postgresql postgres:18
+   ```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+2. Copy `.env.example` to `.env` if you haven't (already done for this checkout) and adjust `DB_*` if your Postgres credentials differ. Defaults match the container above:
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+   ```
+   DB_CONNECTION=pgsql
+   DB_HOST=127.0.0.1
+   DB_PORT=5432
+   DB_DATABASE=cms_backend
+   DB_USERNAME=cms_backend
+   DB_PASSWORD=secret
+   ```
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+3. Install dependencies, migrate, and seed demo data:
 
-## Agentic Development
+   ```bash
+   composer install
+   php artisan migrate
+   php artisan db:seed
+   ```
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+4. Serve the app:
 
-```bash
-composer require laravel/boost --dev
+   ```bash
+   php artisan serve
+   ```
 
-php artisan boost:install
+## What's set up, and how to see it in action
+
+### 1. Multi-tenancy (`Tenant` model + structural `tenant_id` scoping)
+
+- `app/Models/Tenant.php` — a tenant (client company). Table `tenants` (`id`, `name`, `slug`).
+- `app/Models/Concerns/BelongsToTenant.php` — trait for any tenant-owned model. It:
+  - registers `App\Models\Scopes\TenantScope` as a **global scope**, so every query against the model is automatically filtered to `auth()->user()->tenant_id`. No query anywhere can accidentally skip this — it's not opt-in per query.
+  - on `creating`, always sets `tenant_id` to the authenticated user's own tenant when one exists — mass-assigning a different `tenant_id` is silently overridden, not honored.
+  - on `updating`, throws if something tries to change `tenant_id` to a different tenant than the authenticated user's.
+- `app/Models/Scopes/TenantScope.php` — the global scope. **No authenticated user → fails closed.** Queries return zero rows, not "everything." This applies unconditionally, including to `User` itself — there's no model-level exception (console/seeders/jobs that need to read across tenants use `Model::withoutGlobalScope(TenantScope::class)` explicitly, same as any other tenant-owned model).
+- `User` uses `BelongsToTenant` (a user belongs to one tenant, via `users.tenant_id`).
+
+#### Login, password reset, and Sanctum still have to find a user pre-auth — without exempting `User` from the scope
+
+Fail-closed-with-no-exceptions creates one real problem: login and password reset need to find a `User` row by email *before* any tenant is known, and Sanctum needs to find the owning `User` for a token the same way. A plain scoped query can't do that — it would fail closed on the very query that's supposed to establish who's logged in.
+
+Instead of exempting the model, two narrow bypasses exist for exactly those lookups, and nothing else:
+
+- `app/Auth/TenantUnscopedEloquentUserProvider.php` — the `users` auth provider (`config/auth.php`, driven by `AppServiceProvider::boot()`'s `Auth::provider(...)` registration). Identical to Laravel's default `EloquentUserProvider`, except it overrides the one method (`newModelQuery()`) that `retrieveById()`, `retrieveByCredentials()`, and `retrieveByToken()` all call, adding `->withoutGlobalScope(TenantScope::class)`. This covers login, password reset, and remember-me — and *only* those, since nothing else in the app goes through this provider.
+- `app/Models/PersonalAccessToken.php` — registered via `Sanctum::usePersonalAccessTokenModel()`. Overrides `tokenable()` (the `morphTo` Sanctum uses to resolve "whose token is this") the same way, so token authentication can find its owner before the tenant is known.
+
+Everything else — a route, a job, a stray `User::where(...)` run without an authenticated actor — gets no bypass and fails closed like any other tenant-owned model. `TenantScope::apply()` itself calls `auth()->user()` directly (not the non-resolving `auth()->hasUser()`): that's safe *because* of the bypasses above — resolving the guard's user, when not yet cached, queries `User` through the unscoped provider, which never re-enters this scope, so there's nothing left to recurse into. Before these bypasses existed, that same line was the exact cause of an infinite loop (`SessionGuard::user()` → `retrieveById()` → scope calls `auth()->user()` → `SessionGuard::user()` again, forever) — `tests/Feature/TenantScopingTest.php`'s session-recursion test is mutation-tested against this: reintroducing the old check-without-bypass makes it fail with a memory-exhaustion crash, confirming the test actually catches the bug it guards against.
+
+`TenantScopingTest` also proves, end to end, that: an unauthenticated direct query against `User` fails closed; login still finds a user across tenants via the unscoped provider; a real session cookie through the full HTTP stack (not `actingAs()`, which sets the guard's user directly and would never catch a recursion regression) reaches the panel; and a live Sanctum token can only ever see its own tenant's data, never another's.
+
+**To use on a future model** (e.g. when you build a `Page` model later):
+
+```php
+class Page extends Model
+{
+    use \App\Models\Concerns\BelongsToTenant;
+}
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+That's it — `Page::all()`, `Page::where(...)`, etc. are now automatically tenant-scoped, and `Page::create([...])` auto-fills `tenant_id`.
 
-## Contributing
+**How to verify it:**
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan test --filter=TenantScopingTest
+```
 
-## Code of Conduct
+Or interactively:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan tinker
+>>> $acme = \App\Models\Tenant::where('slug', 'acme-corp')->first();
+>>> // $acme->users would itself be fail-closed here: nobody is authenticated yet.
+>>> $acmeUser = \App\Models\User::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->where('tenant_id', $acme->id)->first();
+>>> auth()->login($acmeUser);
+>>> \App\Models\User::count();            // 1 — only Acme's user, Globex's is invisible
+```
 
-## Security Vulnerabilities
+### 2. Filament admin panel, tenant-scoped
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- `app/Providers/Filament/AdminPanelProvider.php` — panel at `/admin`, with `->tenant(Tenant::class, slugAttribute: 'slug')`. This turns on tenant switching and tenant-aware navigation/URLs (`/admin/{tenant-slug}/...`) out of the box.
+- `User` implements Filament's `FilamentUser` (`canAccessPanel`) and `HasTenants` (`getTenants`, `canAccessTenant`) contracts, returning only the user's own tenant.
 
-## License
+**To see it in action:** log in at `/admin/login` with a seeded user (see below) — you'll land inside that tenant's admin context. There are no resources yet (none were requested), so the dashboard is empty by design — that's the next phase of work.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Seeded demo users (password `password` for both, from the factory default):
+
+| Tenant | Email | Slug |
+|---|---|---|
+| Acme Corp | `admin@acme-corp.test` | `acme-corp` |
+| Globex Inc | `admin@globex-inc.test` | `globex-inc` |
+
+### 3. API token auth (Sanctum)
+
+- `laravel/sanctum` installed via `php artisan install:api`, which also created `routes/api.php` and registered `api:` routing in `bootstrap/app.php` (currently empty — no endpoints defined per scope).
+- `User` uses `Laravel\Sanctum\HasApiTokens`.
+
+**Example usage** (once real endpoints exist, a frontend site would):
+
+```php
+// Issue a token (e.g. from a login endpoint you'll build later)
+$token = $user->createToken('react-frontend')->plainTextToken;
+```
+
+```
+GET /api/whatever
+Authorization: Bearer <token>
+```
+
+Any route using the `auth:sanctum` middleware will resolve `auth()->user()`, which means the `TenantScope` above applies automatically to API requests too — a token from Acme's user can never see Globex's data.
+
+### 4. Laravel Boost (dev tooling)
+
+Installed per this repo's original setup instructions (now superseded by `AGENTS.md`, which Boost generated with app-specific conventions). Dev-only dependency, not part of the runtime.
+
+## TODO / Open decisions
+
+Not yet settled, and deliberately not written into `CLAUDE.md` until they are:
+
+- **Architecture style** — Controller-only (no Service/Action classes, no Form Requests, inline `processPost()`-style validation) vs idiomatic Laravel (Form Requests, Actions where they earn their keep). Decide once the first real controllers/Filament resources are built.
+- **API contract** — route prefix (`/api` vs root-mounted) and JSON error shapes (validation/abort/500) for `routes/api.php`. Decide once the first public API endpoints are built.
+- **Filament conventions** — Resource/Panel structure conventions, once content model resources exist.
+- **Sanctum API auth notes** — how token auth interacts with tenancy scoping in practice, once real API endpoints exist (ties into the `PersonalAccessToken` bypass already documented above).
