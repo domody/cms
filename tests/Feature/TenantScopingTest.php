@@ -93,25 +93,20 @@ class TenantScopingTest extends TestCase
         // there's nothing left to recurse into. actingAs() or loginUsingId()
         // would not catch a regression here: both set/cache the guard's
         // user directly and never exercise retrieveById() against an
-        // already-populated session.
+        // already-populated session. The route is defined here, in the
+        // test, purely as a probe - no endpoint is added to the app itself.
+        Route::middleware(['web', 'auth'])->get('/_test-probe-web', fn () => [
+            'tenant_id' => auth()->user()->tenant_id,
+        ]);
+
         $tenant = Tenant::factory()->create();
         $user = User::factory()->for($tenant)->create();
 
         $sessionKey = 'login_web_'.sha1(SessionGuard::class);
-        $response = $this->withSession([$sessionKey => $user->id])->get('/admin');
-
-        $response->assertRedirect('/admin/'.$tenant->slug);
-    }
-
-    public function test_authenticated_panel_page_loads_for_the_correct_tenant(): void
-    {
-        $tenant = Tenant::factory()->create();
-        $user = User::factory()->for($tenant)->create();
-
-        $sessionKey = 'login_web_'.sha1(SessionGuard::class);
-        $response = $this->withSession([$sessionKey => $user->id])->get('/admin/'.$tenant->slug);
+        $response = $this->withSession([$sessionKey => $user->id])->get('/_test-probe-web');
 
         $response->assertOk();
+        $response->assertJson(['tenant_id' => $tenant->id]);
     }
 
     public function test_sanctum_token_authentication_resolves_without_infinite_recursion(): void

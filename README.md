@@ -1,12 +1,12 @@
 # CMS Backend
 
-Headless, multi-tenant CMS backend. Laravel + Filament admin panel + token-based API auth (Sanctum), serving content to separate React/Inertia frontend codebases. This is the **project skeleton only** — auth, tenancy, and Filament are wired up; no content models, Builder/Repeater fields, Filament resources, or public API endpoints exist yet.
+Headless, multi-tenant CMS backend. Laravel + a fully custom Livewire admin panel + token-based API auth (Sanctum), serving content to separate React/Inertia frontend codebases. This is the **project skeleton only** — auth and tenancy are wired up; no admin UI, content models, or public API endpoints exist yet.
 
 ## Stack
 
 - Laravel 13, PHP 8.4
 - PostgreSQL (via Docker locally)
-- [Filament 5](https://filamentphp.com) — admin panel at `/admin`, with multi-tenancy
+- [Livewire](https://livewire.laravel.com) — the admin panel is hand-built on Livewire, no admin framework on top
 - [Laravel Sanctum](https://laravel.com/docs/sanctum) — API token auth for external frontends
 - [Laravel Boost](https://laravel.com/docs/boost) — AI agent tooling (dev-only)
 
@@ -70,7 +70,7 @@ Instead of exempting the model, two narrow bypasses exist for exactly those look
 
 Everything else — a route, a job, a stray `User::where(...)` run without an authenticated actor — gets no bypass and fails closed like any other tenant-owned model. `TenantScope::apply()` itself calls `auth()->user()` directly (not the non-resolving `auth()->hasUser()`): that's safe *because* of the bypasses above — resolving the guard's user, when not yet cached, queries `User` through the unscoped provider, which never re-enters this scope, so there's nothing left to recurse into. Before these bypasses existed, that same line was the exact cause of an infinite loop (`SessionGuard::user()` → `retrieveById()` → scope calls `auth()->user()` → `SessionGuard::user()` again, forever) — `tests/Feature/TenantScopingTest.php`'s session-recursion test is mutation-tested against this: reintroducing the old check-without-bypass makes it fail with a memory-exhaustion crash, confirming the test actually catches the bug it guards against.
 
-`TenantScopingTest` also proves, end to end, that: an unauthenticated direct query against `User` fails closed; login still finds a user across tenants via the unscoped provider; a real session cookie through the full HTTP stack (not `actingAs()`, which sets the guard's user directly and would never catch a recursion regression) reaches the panel; and a live Sanctum token can only ever see its own tenant's data, never another's.
+`TenantScopingTest` also proves, end to end, that: an unauthenticated direct query against `User` fails closed; login still finds a user across tenants via the unscoped provider; a real session cookie through the full HTTP stack (not `actingAs()`, which sets the guard's user directly and would never catch a recursion regression) reaches an authenticated route; and a live Sanctum token can only ever see its own tenant's data, never another's.
 
 **To use on a future model** (e.g. when you build a `Page` model later):
 
@@ -93,25 +93,20 @@ Or interactively:
 
 ```bash
 php artisan tinker
->>> $acme = \App\Models\Tenant::where('slug', 'acme-corp')->first();
->>> // $acme->users would itself be fail-closed here: nobody is authenticated yet.
->>> $acmeUser = \App\Models\User::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->where('tenant_id', $acme->id)->first();
->>> auth()->login($acmeUser);
->>> \App\Models\User::count();            // 1 — only Acme's user, Globex's is invisible
+>>> $template = \App\Models\Tenant::where('slug', 'template-site')->first();
+>>> // $template->users would itself be fail-closed here: nobody is authenticated yet.
+>>> $templateUser = \App\Models\User::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->where('tenant_id', $template->id)->first();
+>>> auth()->login($templateUser);
+>>> \App\Models\User::count();            // 1 — only the Template Site's user, Globex's is invisible
 ```
 
-### 2. Filament admin panel, tenant-scoped
+### 2. Admin panel
 
-- `app/Providers/Filament/AdminPanelProvider.php` — panel at `/admin`, with `->tenant(Tenant::class, slugAttribute: 'slug')`. This turns on tenant switching and tenant-aware navigation/URLs (`/admin/{tenant-slug}/...`) out of the box.
-- `User` implements Filament's `FilamentUser` (`canAccessPanel`) and `HasTenants` (`getTenants`, `canAccessTenant`) contracts, returning only the user's own tenant.
-
-**To see it in action:** log in at `/admin/login` with a seeded user (see below) — you'll land inside that tenant's admin context. There are no resources yet (none were requested), so the dashboard is empty by design — that's the next phase of work.
-
-Seeded demo users (password `password` for both, from the factory default):
+Seeded demo users still exist for when the panel's login is built (password `password` for both, from the factory default):
 
 | Tenant | Email | Slug |
 |---|---|---|
-| Acme Corp | `admin@acme-corp.test` | `acme-corp` |
+| Template Site | `admin@template-site.test` | `template-site` |
 | Globex Inc | `admin@globex-inc.test` | `globex-inc` |
 
 ### 3. API token auth (Sanctum)
@@ -131,7 +126,7 @@ GET /api/whatever
 Authorization: Bearer <token>
 ```
 
-Any route using the `auth:sanctum` middleware will resolve `auth()->user()`, which means the `TenantScope` above applies automatically to API requests too — a token from Acme's user can never see Globex's data.
+Any route using the `auth:sanctum` middleware will resolve `auth()->user()`, which means the `TenantScope` above applies automatically to API requests too — a token from the Template Site's user can never see Globex's data.
 
 ### 4. Laravel Boost (dev tooling)
 
@@ -141,7 +136,7 @@ Installed per this repo's original setup instructions (now superseded by `AGENTS
 
 Not yet settled, and deliberately not written into `CLAUDE.md` until they are:
 
-- **Architecture style** — Controller-only (no Service/Action classes, no Form Requests, inline `processPost()`-style validation) vs idiomatic Laravel (Form Requests, Actions where they earn their keep). Decide once the first real controllers/Filament resources are built.
+- **Architecture style** — Controller-only (no Service/Action classes, no Form Requests, inline `processPost()`-style validation) vs idiomatic Laravel (Form Requests, Actions where they earn their keep). Decide once the first real controllers are built.
 - **API contract** — route prefix (`/api` vs root-mounted) and JSON error shapes (validation/abort/500) for `routes/api.php`. Decide once the first public API endpoints are built.
-- **Filament conventions** — Resource/Panel structure conventions, once content model resources exist.
+- **Admin panel conventions** — Livewire component structure, layout, and auth/session wiring for the custom panel, once it's built.
 - **Sanctum API auth notes** — how token auth interacts with tenancy scoping in practice, once real API endpoints exist (ties into the `PersonalAccessToken` bypass already documented above).

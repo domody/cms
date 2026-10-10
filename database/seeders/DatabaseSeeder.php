@@ -19,9 +19,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $acme = Tenant::factory()->create([
-            'name' => 'Acme Corp',
-            'slug' => 'acme-corp',
+        $template = Tenant::factory()->create([
+            'name' => 'Template Site',
+            'slug' => 'template-site',
         ]);
 
         $globex = Tenant::factory()->create([
@@ -30,9 +30,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::factory()->create([
-            'tenant_id' => $acme->id,
-            'name' => 'Acme Admin',
-            'email' => 'admin@acme-corp.test',
+            'tenant_id' => $template->id,
+            'name' => 'Template Admin',
+            'email' => 'admin@template-site.test',
         ]);
 
         User::factory()->create([

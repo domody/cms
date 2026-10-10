@@ -14,7 +14,7 @@
 |-------|------------|
 | Framework | Laravel 13, PHP 8.4 |
 | Database | PostgreSQL (Docker locally) |
-| Admin | Filament 5 — panel at `/admin`, multi-tenant |
+| Admin | Custom Livewire panel |
 | API Auth | Laravel Sanctum (token-based) |
 | Dev tooling | Laravel Boost (MCP, dev-only) |
 
@@ -67,6 +67,16 @@ public function up(): void
     Schema::create('page_revisions', fn (Blueprint $table) => /* ... */ null);
 }
 ```
+
+## Blade Layouts
+
+- Auth pages (login, password reset, etc.) use `@extends('layouts.auth')`.
+- Every other page uses `@extends('layouts.admin')`.
+
+## View-specific JS
+
+- JS for a given view lives in `public/js/<path.filename>.js`, mirroring the view's dotted path (e.g. `resources/views/layouts/admin.blade.php` → `public/js/layout.admin.js`).
+- Reference it at the bottom of the view in a `@push('scripts')` block.
 
 ## Local Dev
 
