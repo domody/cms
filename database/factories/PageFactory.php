@@ -3,7 +3,8 @@
 namespace Database\Factories;
 
 use App\Models\Page;
-use App\Models\Tenant;
+use App\Models\PageStatus;
+use App\Models\Site;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -19,10 +20,10 @@ class PageFactory extends Factory
         $title = fake()->unique()->words(2, true);
 
         return [
-            'tenant_id' => Tenant::factory(),
+            'site_id' => Site::factory(),
             'slug' => str($title)->slug()->toString(),
             'title' => ucfirst($title),
-            'status' => 'draft',
+            'status' => PageStatus::DRAFT,
             'published_at' => null,
         ];
     }
@@ -30,7 +31,7 @@ class PageFactory extends Factory
     public function published(): static
     {
         return $this->state(fn () => [
-            'status' => 'published',
+            'status' => PageStatus::PUBLISHED,
             'published_at' => now(),
         ]);
     }

@@ -13,31 +13,31 @@ return new class extends Migration
     {
         Schema::create('block_definitions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('site_id')->constrained()->cascadeOnDelete();
             $table->string('key');
             $table->string('label');
             $table->unsignedInteger('version')->default(1);
             $table->jsonb('schema');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'key']);
+            $table->unique(['site_id', 'key']);
         });
 
         Schema::create('pages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('site_id')->constrained()->cascadeOnDelete();
             $table->string('slug');
             $table->string('title');
             $table->string('status')->default('draft');
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'slug']);
+            $table->unique(['site_id', 'slug']);
         });
 
         Schema::create('page_blocks', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('site_id')->constrained()->cascadeOnDelete();
             $table->foreignId('page_id')->constrained()->cascadeOnDelete();
             $table->string('block_key');
             $table->unsignedInteger('position');

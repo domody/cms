@@ -18,7 +18,7 @@ class PageBlockFactory extends Factory
     {
         return [
             'page_id' => Page::factory(),
-            'tenant_id' => fn (array $attributes) => Page::withoutGlobalScopes()->find($attributes['page_id'])->tenant_id,
+            'site_id' => fn (array $attributes) => Page::withoutGlobalScopes()->find($attributes['page_id'])->site_id,
             'block_key' => 'hero',
             'position' => 0,
             'is_visible' => true,

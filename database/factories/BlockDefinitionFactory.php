@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\BlockDefinition;
-use App\Models\Tenant;
+use App\Models\Site;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -19,7 +19,7 @@ class BlockDefinitionFactory extends Factory
         $key = fake()->unique()->slug(1);
 
         return [
-            'tenant_id' => Tenant::factory(),
+            'site_id' => Site::factory(),
             'key' => $key,
             'label' => ucfirst($key),
             'version' => 1,

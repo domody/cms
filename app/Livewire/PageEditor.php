@@ -2,30 +2,37 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\Toasts;
+use App\Models\ActivityLog;
 use App\Models\BlockDefinition;
 use App\Models\Page;
 use App\Models\PageBlock;
+use App\Models\PageStatus;
+use App\Models\Scopes\CurrentSite;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Inline accordion editor for a page: title/status, then every block in
- * order with its fields (generated from the block's definition), plus
- * move up/down and show/hide. Nothing is persisted until save().
+ * Editor for a page: title/status, a "Page Structure" list of every block
+ * (drag to reorder, show/hide, select), and a card with the selected block's
+ * fields (generated from its definition). Nothing is persisted until save().
  */
 class PageEditor extends Component
 {
+    use Toasts;
+
     #[Locked]
     public int $pageId;
 
     public string $title = '';
 
-    public string $status = 'draft';
+    public string $status = PageStatus::DRAFT;
 
     /**
      * Client-side working copy of the page's blocks. Only `id` is trusted
@@ -35,11 +42,24 @@ class PageEditor extends Component
      */
     public array $blocks = [];
 
+    /**
+     * Id of the block whose fields are shown in the edit card.
+     */
+    public ?int $selectedBlockId = null;
+
     public function mount(Page $page): void
     {
         $this->pageId = $page->id;
 
         $this->loadState();
+        $this->selectedBlockId = $this->blocks[0]['id'] ?? null;
+    }
+
+    public function selectBlock(int $id): void
+    {
+        if (collect($this->blocks)->contains('id', $id)) {
+            $this->selectedBlockId = $id;
+        }
     }
 
     /**
@@ -51,20 +71,28 @@ class PageEditor extends Component
         return BlockDefinition::all()->keyBy('key');
     }
 
-    public function moveUp(int $index): void
+    /**
+     * Drag-and-drop reorder (wire:sort): move block $id to zero-based $position.
+     */
+    public function sortBlock(int|string $id, int $position): void
     {
-        $this->swap($index, $index - 1);
-    }
+        $from = collect($this->blocks)->search(fn (array $block) => $block['id'] === (int) $id);
 
-    public function moveDown(int $index): void
-    {
-        $this->swap($index, $index + 1);
+        if ($from === false) {
+            return;
+        }
+
+        $moved = array_splice($this->blocks, $from, 1);
+        array_splice($this->blocks, max(0, min($position, count($this->blocks))), 0, $moved);
+
+        $this->dispatch('editor-dirty');
     }
 
     public function toggleVisibility(int $index): void
     {
         if (isset($this->blocks[$index])) {
             $this->blocks[$index]['is_visible'] = ! $this->blocks[$index]['is_visible'];
+            $this->dispatch('editor-dirty');
         }
     }
 
@@ -75,7 +103,7 @@ class PageEditor extends Component
 
         $rules = [
             'title' => ['required', 'string', 'max:255'],
-            'status' => ['required', 'in:draft,published'],
+            'status' => ['required', Rule::in(PageStatus::all())],
         ];
         $attributes = [];
 
@@ -88,20 +116,36 @@ class PageEditor extends Component
 
             $rules = array_merge($rules, $definition->contentRules("blocks.$index.content"));
 
-            foreach ($definition->fields() as $field) {
+            foreach ($definition->editableFields() as $field) {
                 $attributes["blocks.$index.content.{$field['name']}"] = "{$definition->label} → {$field['label']}";
                 $attributes["blocks.$index.content.{$field['name']}.label"] = "{$definition->label} → {$field['label']} label";
                 $attributes["blocks.$index.content.{$field['name']}.url"] = "{$definition->label} → {$field['label']} URL";
             }
         }
 
-        $this->validate($rules, [], $attributes);
+        try {
+            $this->validate($rules, [], $attributes);
+        } catch (ValidationException $e) {
+            foreach ($this->blocks as $index => $state) {
+                if (collect($e->validator->errors()->keys())->contains(fn ($key) => str_starts_with($key, "blocks.$index."))) {
+                    $this->selectedBlockId = $state['id'];
+
+                    break;
+                }
+            }
+
+            $this->toast('error', 'Fix the highlighted fields, then save again.', 'Page not saved');
+
+            throw $e;
+        }
+
+        $previousOrder = $rows->sortBy('position')->keys()->values()->all();
 
         DB::transaction(function () use ($page, $rows): void {
             $page->update([
                 'title' => $this->title,
                 'status' => $this->status,
-                'published_at' => $this->status === 'published' ? ($page->published_at ?? now()) : $page->published_at,
+                'published_at' => $this->status === PageStatus::PUBLISHED ? ($page->published_at ?? now()) : $page->published_at,
             ]);
 
             $position = 0;
@@ -114,14 +158,7 @@ class PageEditor extends Component
                 }
 
                 $definition = $this->definitionFor($row);
-                $content = $row->content ?? [];
-
-                foreach ($definition?->fields() ?? [] as $field) {
-                    $content[$field['name']] = $this->normalize(
-                        $field['type'],
-                        $state['content'][$field['name']] ?? BlockDefinition::blankValue($field['type']),
-                    );
-                }
+                $content = $definition?->normalizedContent($row->content ?? [], $state['content']) ?? $row->content ?? [];
 
                 $row->update([
                     'position' => $position++,
@@ -132,9 +169,16 @@ class PageEditor extends Component
             }
         });
 
+        if ($previousOrder !== collect($this->blocks)->pluck('id')->intersect($previousOrder)->values()->all()) {
+            ActivityLog::record($page, 'reordered');
+        }
+
         $this->loadState();
 
-        session()->flash('status', 'Page saved.');
+        app(CurrentSite::class)->get()?->revalidateFrontend(["page:{$page->slug}"]);
+
+        $this->dispatch('editor-saved');
+        $this->toast('success', 'Page saved.');
     }
 
     public function render(): View
@@ -153,58 +197,13 @@ class PageEditor extends Component
                 'id' => $block->id,
                 'block_key' => $block->block_key,
                 'is_visible' => $block->is_visible,
-                'content' => $this->contentWithBlanks($block),
+                'content' => $this->definitionFor($block)?->contentWithBlanks($block->content ?? []) ?? $block->content ?? [],
             ])
             ->all();
-    }
-
-    /**
-     * Every schema field gets a key, so the form always has something to bind to.
-     *
-     * @return array<string, mixed>
-     */
-    private function contentWithBlanks(PageBlock $block): array
-    {
-        $content = $block->content ?? [];
-
-        foreach ($this->definitionFor($block)?->fields() ?? [] as $field) {
-            $value = $content[$field['name']] ?? BlockDefinition::blankValue($field['type']);
-
-            $content[$field['name']] = $field['type'] === 'link'
-                ? ['label' => $value['label'] ?? null, 'url' => $value['url'] ?? null]
-                : $value;
-        }
-
-        return $content;
     }
 
     private function definitionFor(?PageBlock $block): ?BlockDefinition
     {
         return $block === null ? null : $this->definitions->get($block->block_key);
-    }
-
-    private function normalize(string $type, mixed $value): mixed
-    {
-        if ($type === 'boolean') {
-            return (bool) $value;
-        }
-
-        if ($type === 'link') {
-            $label = filled($value['label'] ?? null) ? trim($value['label']) : null;
-            $url = filled($value['url'] ?? null) ? trim($value['url']) : null;
-
-            return $label === null && $url === null ? null : ['label' => $label, 'url' => $url];
-        }
-
-        return filled($value) ? Str::of($value)->trim()->toString() : null;
-    }
-
-    private function swap(int $from, int $to): void
-    {
-        if (! isset($this->blocks[$from], $this->blocks[$to])) {
-            return;
-        }
-
-        [$this->blocks[$from], $this->blocks[$to]] = [$this->blocks[$to], $this->blocks[$from]];
     }
 }

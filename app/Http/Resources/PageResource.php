@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\BlockDefinition;
 use App\Models\Page;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,13 +24,9 @@ class PageResource extends JsonResource
             'slug' => $this->slug,
             'title' => $this->title,
             'published_at' => $this->published_at,
-            'blocks' => $this->blocks
-                ->where('is_visible', true)
-                ->values()
-                ->map(fn ($block) => [
-                    'type' => $block->block_key,
-                    'content' => $block->content,
-                ]),
+            'blocks' => BlockDefinition::resolveBlocks(
+                $this->blocks->where('is_visible', true)->values(),
+            ),
         ];
     }
 }

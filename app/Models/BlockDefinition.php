@@ -2,22 +2,23 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\BelongsToSite;
+use App\Models\Concerns\HasContentFields;
 use Database\Factories\BlockDefinitionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 /**
  * A block type declared by the frontend code (e.g. "hero") and its
  * editable fields. Synced from the code's manifest, never created by users.
  */
-#[Fillable(['tenant_id', 'key', 'label', 'version', 'schema'])]
+#[Fillable(['site_id', 'key', 'label', 'version', 'schema'])]
 class BlockDefinition extends Model
 {
     /** @use HasFactory<BlockDefinitionFactory> */
-    use BelongsToTenant, HasFactory;
+    use BelongsToSite, HasContentFields, HasFactory;
 
     /**
      * @return array<string, string>
@@ -25,85 +26,45 @@ class BlockDefinition extends Model
     protected function casts(): array
     {
         return [
-            'tenant_id' => 'integer',
+            'site_id' => 'integer',
             'version' => 'integer',
             'schema' => 'array',
         ];
     }
 
     /**
-     * The schema's fields with defaults filled in (label, required, options).
+     * Blocks in the shape handed to frontends, {type, content}. Image fields
+     * are resolved from media ids to {url, alt, width, height}, and
+     * `collection` fields (which store a collection key) are filled with that
+     * collection's published entries, or an empty list if none is chosen.
      *
-     * @return array<int, array{name: string, type: string, label: string, required: bool, options: array<int, string>}>
+     * @param  Collection<int, PageBlock>  $blocks
+     * @return Collection<int, array{type: string, content: array<string, mixed>}>
      */
-    public function fields(): array
+    public static function resolveBlocks(Collection $blocks): Collection
     {
-        return array_map(fn (array $field) => [
-            'name' => $field['name'],
-            'type' => $field['type'],
-            'label' => $field['label'] ?? Str::headline($field['name']),
-            'required' => (bool) ($field['required'] ?? false),
-            'options' => $field['options'] ?? [],
-        ], $this->schema ?? []);
-    }
+        $definitions = static::all()->keyBy('key');
 
-    /**
-     * Validation rules for a block's content, keyed by full dotted path
-     * under $prefix (e.g. "blocks.0.content").
-     *
-     * @return array<string, array<int, string>>
-     */
-    public function contentRules(string $prefix): array
-    {
-        $rules = [];
+        $items = $blocks->map(fn (PageBlock $block): array => [
+            'content' => $block->content ?? [],
+            'images' => $definitions->get($block->block_key)?->imageFieldNames() ?? [],
+        ])->all();
 
-        foreach ($this->fields() as $field) {
-            $path = "$prefix.{$field['name']}";
-            $presence = $field['required'] ? 'required' : 'nullable';
+        $resolved = Media::resolveImages($items);
+        $entries = [];
 
-            switch ($field['type']) {
-                case 'link':
-                    $rules["$path.label"] = [$presence, 'string', 'max:255'];
-                    $rules["$path.url"] = [$presence, 'string', 'max:2048'];
+        return $blocks->map(function (PageBlock $block, int $index) use ($definitions, $resolved, &$entries): array {
+            $content = $resolved[$index];
 
-                    break;
-                case 'textarea':
-                case 'richtext':
-                    $rules[$path] = [$presence, 'string', 'max:10000'];
-
-                    break;
-                case 'image':
-                    $rules[$path] = [$presence, 'string', 'max:2048'];
-
-                    break;
-                case 'boolean':
-                    $rules[$path] = ['boolean'];
-
-                    break;
-                case 'select':
-                    $rules[$path] = [$presence, 'string', ...($field['options'] === [] ? [] : ['in:'.implode(',', $field['options'])])];
-
-                    break;
-                default:
-                    $rules[$path] = [$presence, 'string', 'max:255'];
+            foreach ($definitions->get($block->block_key)?->fields() ?? [] as $field) {
+                if ($field['type'] === 'collection') {
+                    $key = $content[$field['name']] ?? null;
+                    $list = is_string($key) && $key !== '' ? $entries[$key] ??= CollectionEntry::publishedPayloads($key) : [];
+                    $content[$field['name']] = $field['limit'] === null ? $list : array_slice($list, 0, $field['limit']);
+                }
             }
-        }
 
-        return $rules;
-    }
-
-    /**
-     * A blank value for a field type, used to fill content keys the block
-     * doesn't have yet (e.g. after a field was added in code).
-     *
-     * @return array<string, mixed>|bool|string|null
-     */
-    public static function blankValue(string $type): array|bool|string|null
-    {
-        return match ($type) {
-            'link' => ['label' => null, 'url' => null],
-            'boolean' => false,
-            default => null,
-        };
+            return ['type' => $block->block_key, 'content' => $content];
+        })->values();
     }
 }

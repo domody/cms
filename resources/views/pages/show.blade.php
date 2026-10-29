@@ -1,20 +1,19 @@
-@extends('layouts.admin')
+@extends('layouts.admin', [
+    'title' => $page->title,
+    'pageTitle' => $page->title,
+    'pageDescription' => '/'.$page->slug.' · '.\App\Models\PageStatus::label($page->status)
+        .($page->status !== \App\Models\PageStatus::PUBLISHED ? ' (not served by the API until published)' : ''),
+    'breadcrumbs' => [
+        ['label' => 'Pages', 'route' => route('pages.index')],
+        ['label' => $page->title],
+    ],
+])
+
+@section('pageActions')
+    <a href="{{ route('pages.edit', $page) }}" class="btn">Edit</a>
+@endsection
 
 @section('content')
-    <div class="mb-4 flex items-center justify-between">
-        <div>
-            <a href="{{ route('pages.index') }}" class="text-sm text-gray-500 hover:text-gray-900">&larr; Pages</a>
-            <h1 class="text-xl font-semibold text-gray-900">{{ $page->title }}</h1>
-            <p class="text-sm text-gray-500">
-                /{{ $page->slug }} &middot; {{ ucfirst($page->status) }}
-                @if ($page->status !== 'published')
-                    <span class="text-amber-700">(not served by the API until published)</span>
-                @endif
-            </p>
-        </div>
-        <a href="{{ route('pages.edit', $page) }}" class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800">Edit</a>
-    </div>
-
     <div class="space-y-3">
         @forelse ($page->blocks as $block)
             @php $definition = $definitions->get($block->block_key); @endphp

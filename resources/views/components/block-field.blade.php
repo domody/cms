@@ -1,13 +1,28 @@
 @props(['field', 'path'])
 
-@php
-    $inputClass = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10';
-@endphp
-
 <div>
-    @if ($field['type'] === 'boolean')
+    @if ($field['type'] === 'image')
+        <div class="block text-sm font-medium text-gray-700">
+            {{ $field['label'] }}@if ($field['required']) <span class="text-red-600">*</span>@endif
+            <livewire:media-picker wire:model="{{ $path }}" :key="'media-picker-'.$path" />
+        </div>
+    @elseif ($field['type'] === 'collection')
+        <label class="block text-sm font-medium text-gray-700">
+            {{ $field['label'] }}@if ($field['required']) <span class="text-red-600">*</span>@endif
+            <select wire:model="{{ $path }}" class="input mt-1">
+                <option value="">&mdash;</option>
+                @foreach (\App\Models\CollectionDefinition::orderBy('label')->pluck('label', 'key') as $key => $label)
+                    <option value="{{ $key }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <span class="mt-1 block text-xs font-normal text-gray-500">
+                Shows this collection's published entries @if ($field['limit']) (first {{ $field['limit'] }}) @endif.
+                <a href="{{ route('collections.index') }}" class="underline">Manage collections</a>
+            </span>
+        </label>
+    @elseif ($field['type'] === 'boolean')
         <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input type="checkbox" wire:model="{{ $path }}" class="rounded border-gray-300">
+            <input type="checkbox" wire:model="{{ $path }}" class="checkbox">
             {{ $field['label'] }}
         </label>
     @else
@@ -16,13 +31,13 @@
 
             @switch($field['type'])
                 @case('textarea')
-                    <textarea wire:model="{{ $path }}" rows="4" class="{{ $inputClass }}"></textarea>
+                    <textarea wire:model="{{ $path }}" rows="4" class="input mt-1"></textarea>
                     @break
                 @case('richtext')
-                    <textarea wire:model="{{ $path }}" rows="8" class="{{ $inputClass }}"></textarea>
+                    <textarea wire:model="{{ $path }}" rows="8" class="input mt-1"></textarea>
                     @break
                 @case('select')
-                    <select wire:model="{{ $path }}" class="{{ $inputClass }}">
+                    <select wire:model="{{ $path }}" class="input mt-1">
                         <option value="">&mdash;</option>
                         @foreach ($field['options'] as $option)
                             <option value="{{ $option }}">{{ $option }}</option>
@@ -31,15 +46,12 @@
                     @break
                 @case('link')
                     <div class="grid gap-2 sm:grid-cols-2">
-                        <input type="text" wire:model="{{ $path }}.label" placeholder="Label" class="{{ $inputClass }}">
-                        <input type="text" wire:model="{{ $path }}.url" placeholder="URL" class="{{ $inputClass }}">
+                        <input type="text" wire:model="{{ $path }}.label" placeholder="Label" class="input mt-1">
+                        <input type="text" wire:model="{{ $path }}.url" placeholder="URL" class="input mt-1">
                     </div>
                     @break
-                @case('image')
-                    <input type="text" wire:model="{{ $path }}" placeholder="Image URL" class="{{ $inputClass }}">
-                    @break
                 @default
-                    <input type="text" wire:model="{{ $path }}" class="{{ $inputClass }}">
+                    <input type="text" wire:model="{{ $path }}" class="input mt-1">
             @endswitch
         </label>
     @endif
