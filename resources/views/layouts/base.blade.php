@@ -17,6 +17,10 @@
 <body class="antialiased @yield('body_class')">
     @yield('base.content')
 
+    <x-toasts />
+
+    {{-- Alpine ships with Livewire, which only auto-injects on pages with a Livewire component. --}}
+    @livewireScripts
     @stack('scripts')
 </body>
 </html>
