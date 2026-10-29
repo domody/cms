@@ -2,14 +2,15 @@
 
 namespace Database\Factories;
 
-use App\Models\Tenant;
+use App\Models\Site;
+use App\Models\SitePlan;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
- * @extends Factory<Tenant>
+ * @extends Factory<Site>
  */
-class TenantFactory extends Factory
+class SiteFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -23,6 +24,15 @@ class TenantFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 100000),
+            'plan' => SitePlan::STARTER,
         ];
+    }
+
+    /**
+     * Put the site on the given plan (a SitePlan value).
+     */
+    public function plan(string $plan): static
+    {
+        return $this->state(fn (array $attributes) => ['plan' => $plan]);
     }
 }

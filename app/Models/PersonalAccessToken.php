@@ -2,18 +2,20 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 
 /**
- * Registered via Sanctum::usePersonalAccessTokenModel() so that resolving a
- * token's owner (tokenable()) bypasses TenantScope the same way login does -
- * the tenant isn't known until the owning User is found.
+ * Registered via Sanctum::usePersonalAccessTokenModel(). Adds the site a
+ * token is bound to: an API token always works inside exactly one site.
  */
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
-    public function tokenable()
+    /**
+     * @return BelongsTo<Site, $this>
+     */
+    public function site(): BelongsTo
     {
-        return parent::tokenable()->withoutGlobalScope(TenantScope::class);
+        return $this->belongsTo(Site::class);
     }
 }

@@ -13,13 +13,25 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+        });
+
+        // Membership: a user can belong to many sites, with a role on each.
+        // The pivot's own id gives a stable order, so "the first site" a user
+        // lands on after login is the one they joined first.
+        Schema::create('site_user', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('site_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('role')->default('editor');
+            $table->timestamps();
+
+            $table->unique(['site_id', 'user_id']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -43,6 +55,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('site_user');
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');

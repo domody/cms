@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Tenant;
+use App\Models\AccessLevel;
+use App\Models\Site;
+use App\Models\SiteRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -26,13 +28,33 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => Tenant::factory(),
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'access_level' => AccessLevel::CUSTOMER,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * A site-wide admin: reaches the platform area and every site.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'access_level' => AccessLevel::ADMIN,
+        ]);
+    }
+
+    /**
+     * Make the user a member of the given site, with the given role.
+     */
+    public function memberOf(Site $site, string $role = SiteRole::EDITOR): static
+    {
+        return $this->afterCreating(
+            fn (User $user) => $user->sites()->attach($site->id, ['role' => $role])
+        );
     }
 
     /**

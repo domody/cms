@@ -23,6 +23,8 @@ class LoginController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        $credentials['disabled_at'] = null;
+
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             throw ValidationException::withMessages([
                 'email' => 'These credentials do not match our records.',
@@ -31,7 +33,7 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(route('home'));
     }
 
     public function destroy(Request $request): RedirectResponse

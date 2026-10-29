@@ -11,11 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('tenants', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('slug')->unique();
-            $table->timestamps();
+        // Defaults to the lowest level, so a row without a value is never an admin.
+        Schema::table('users', function (Blueprint $table) {
+            $table->string('access_level')->default('customer')->after('password');
         });
     }
 
@@ -24,6 +22,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('tenants');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('access_level');
+        });
     }
 };

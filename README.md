@@ -1,142 +1,125 @@
 # CMS Backend
 
-Headless, multi-tenant CMS backend. Laravel + a fully custom Livewire admin panel + token-based API auth (Sanctum), serving content to separate React/Inertia frontend codebases. This is the **project skeleton only** — auth and tenancy are wired up; no admin UI, content models, or public API endpoints exist yet.
+Headless, multi-site CMS. Laravel + a hand-built Livewire admin panel + Sanctum token auth for the frontends. Each client site is a separate frontend codebase (see `../frontend-template`, a Next.js example) that declares its own blocks and collections in code, syncs them to this CMS, and reads published content over the API. Clients log in here to edit that content.
+
+This is the **alpha**: pages, blocks, collections and images, with the operator tooling to onboard a client by hand. Self-serve signup, a blog, navigation and global settings are not built (see [Not in the alpha](#not-in-the-alpha)).
 
 ## Stack
 
 - Laravel 13, PHP 8.4
-- PostgreSQL (via Docker locally)
-- [Livewire](https://livewire.laravel.com) — the admin panel is hand-built on Livewire, no admin framework on top
-- [Laravel Sanctum](https://laravel.com/docs/sanctum) — API token auth for external frontends
-- [Laravel Boost](https://laravel.com/docs/boost) — AI agent tooling (dev-only)
+- PostgreSQL (Docker locally)
+- [Livewire](https://livewire.laravel.com) 4, the admin panel is hand-built on it
+- [Laravel Sanctum](https://laravel.com/docs/sanctum) for API tokens
+- [Laravel Boost](https://laravel.com/docs/boost), dev-only AI tooling
 
 ## Local setup
 
-1. Start a Postgres container (already created for this project as `cms_backend_postgres`):
+1. Start Postgres (the container already exists for this project):
 
    ```bash
    docker start cms_backend_postgres
-   # first time only, if the container doesn't exist yet:
+   # first time only, if it doesn't exist yet:
    docker run -d --name cms_backend_postgres \
      -e POSTGRES_DB=cms_backend -e POSTGRES_USER=cms_backend -e POSTGRES_PASSWORD=secret \
      -p 5432:5432 -v cms_backend_pgdata:/var/lib/postgresql postgres:18
    ```
 
-2. Copy `.env.example` to `.env` if you haven't (already done for this checkout) and adjust `DB_*` if your Postgres credentials differ. Defaults match the container above:
+2. Copy `.env.example` to `.env` and adjust `DB_*` if needed. Set **`APP_URL` to the address the CMS is really served on**: image URLs in the API are built from it, and the frontend must be able to load them.
 
-   ```
-   DB_CONNECTION=pgsql
-   DB_HOST=127.0.0.1
-   DB_PORT=5432
-   DB_DATABASE=cms_backend
-   DB_USERNAME=cms_backend
-   DB_PASSWORD=secret
-   ```
-
-3. Install dependencies, migrate, and seed demo data:
+3. Install, migrate, seed demo data, link public storage:
 
    ```bash
    composer install
    php artisan migrate
    php artisan db:seed
+   php artisan storage:link
    ```
 
-4. Serve the app:
+   The seeder prints an API token for the Template Site (read + sync). Put it in `../frontend-template/.env.local` as `CMS_TOKEN`.
 
-   ```bash
-   php artisan serve
-   ```
+4. Serve it (Herd serves it at `http://cms-backend.test`, or `php artisan serve`).
 
-## What's set up, and how to see it in action
+Seeded logins (password `password` for all):
 
-### 1. Multi-tenancy (`Tenant` model + structural `tenant_id` scoping)
+| Email | Who |
+|---|---|
+| `admin@cms.test` | Platform admin: the operator area and every site |
+| `web@cms.test` | Customer on three sites (owner / admin / editor) |
+| `admin@template-site.test` | Customer, owner of Template Site, editor on Globex |
+| `admin@globex-inc.test` | Customer, owner of Globex Inc |
 
-- `app/Models/Tenant.php` — a tenant (client company). Table `tenants` (`id`, `name`, `slug`).
-- `app/Models/Concerns/BelongsToTenant.php` — trait for any tenant-owned model. It:
-  - registers `App\Models\Scopes\TenantScope` as a **global scope**, so every query against the model is automatically filtered to `auth()->user()->tenant_id`. No query anywhere can accidentally skip this — it's not opt-in per query.
-  - on `creating`, always sets `tenant_id` to the authenticated user's own tenant when one exists — mass-assigning a different `tenant_id` is silently overridden, not honored.
-  - on `updating`, throws if something tries to change `tenant_id` to a different tenant than the authenticated user's.
-- `app/Models/Scopes/TenantScope.php` — the global scope. **No authenticated user → fails closed.** Queries return zero rows, not "everything." This applies unconditionally, including to `User` itself — there's no model-level exception (console/seeders/jobs that need to read across tenants use `Model::withoutGlobalScope(TenantScope::class)` explicitly, same as any other tenant-owned model).
-- `User` uses `BelongsToTenant` (a user belongs to one tenant, via `users.tenant_id`).
+## Concepts
 
-#### Login, password reset, and Sanctum still have to find a user pre-auth — without exempting `User` from the scope
+- **Sites.** A site is a client's website. Everything a client edits (pages, blocks, collections, images) belongs to one site and is scoped to it automatically; code that reads across sites has to say so explicitly. The site's slug is the first URL segment of its admin: `/{slug}/dashboard`.
+- **Users and access levels.** Users are global. An *admin* is the operator: the whole `/admin` area and every site. A *customer* only reaches the sites they belong to and can only edit content. What each level may do is in `config/acl.php`; anything not listed there is a 404. Per-site roles (owner / admin / editor) are stored but **not enforced yet**: every member can edit everything on their site.
+- **Pages and blocks.** The frontend declares block types (with typed fields) and pages in its manifest. Editors reorder, hide and edit blocks; they cannot create or delete pages.
+- **Collections.** Repeatable content (team members, testimonials) declared in the manifest. Editors manage them under **Collections** (a grid of all the site's collections; open one to add, edit, reorder and delete entries, draft/published, slug generated from the title). Collections have no page of their own: a block shows one through a `collection` field. The editor picks which collection on the page, from every collection on the site, and the API fills the field with that collection's published entries (the frontend decides only how they look).
+- **Media.** A per-site image library (jpg, png, webp, gif, up to 5 MB, alt text required). SVG is not accepted. An `image` field stores the media id and the API returns `{url, alt, width, height}`.
+- **API tokens.** Owned by a site, never by a user, and created only by an admin on the site's page. A `read` token serves content (give this to production); a `read + sync` token can also push the manifest (CI / dev). Shown once when created, revocable.
+- **Revalidation.** If a site has a revalidate URL and secret, saving a page or collection entry (or changing an image) POSTs the affected cache tags to the frontend so edits appear straight away. Failures are logged and never block the save.
 
-Fail-closed-with-no-exceptions creates one real problem: login and password reset need to find a `User` row by email *before* any tenant is known, and Sanctum needs to find the owning `User` for a token the same way. A plain scoped query can't do that — it would fail closed on the very query that's supposed to establish who's logged in.
+## Onboarding a client
 
-Instead of exempting the model, two narrow bypasses exist for exactly those lookups, and nothing else:
+As the platform admin, in the CMS:
 
-- `app/Auth/TenantUnscopedEloquentUserProvider.php` — the `users` auth provider (`config/auth.php`, driven by `AppServiceProvider::boot()`'s `Auth::provider(...)` registration). Identical to Laravel's default `EloquentUserProvider`, except it overrides the one method (`newModelQuery()`) that `retrieveById()`, `retrieveByCredentials()`, and `retrieveByToken()` all call, adding `->withoutGlobalScope(TenantScope::class)`. This covers login, password reset, and remember-me — and *only* those, since nothing else in the app goes through this provider.
-- `app/Models/PersonalAccessToken.php` — registered via `Sanctum::usePersonalAccessTokenModel()`. Overrides `tokenable()` (the `morphTo` Sanctum uses to resolve "whose token is this") the same way, so token authentication can find its owner before the tenant is known.
+1. **Admin > Sites > Add site.** Name it; the slug (which can't be changed later) is generated or typed.
+2. **Admin > Users > Add user** for each person who will edit. Choose the site and role; leave the password blank to generate one and pass it on (it is shown once). Customers can change it themselves under Account.
+3. On the site's page: **API tokens > Create token.** Make a *Read + sync* token for dev/CI and a *Read only* token for production. Copy each: it is only shown once.
+4. On the same page, set the **Revalidate URL** (`https://<their-site>/api/revalidate`) and **Revalidate secret** once the frontend is deployed.
 
-Everything else — a route, a job, a stray `User::where(...)` run without an authenticated actor — gets no bypass and fails closed like any other tenant-owned model. `TenantScope::apply()` itself calls `auth()->user()` directly (not the non-resolving `auth()->hasUser()`): that's safe *because* of the bypasses above — resolving the guard's user, when not yet cached, queries `User` through the unscoped provider, which never re-enters this scope, so there's nothing left to recurse into. Before these bypasses existed, that same line was the exact cause of an infinite loop (`SessionGuard::user()` → `retrieveById()` → scope calls `auth()->user()` → `SessionGuard::user()` again, forever) — `tests/Feature/TenantScopingTest.php`'s session-recursion test is mutation-tested against this: reintroducing the old check-without-bypass makes it fail with a memory-exhaustion crash, confirming the test actually catches the bug it guards against.
+In the frontend project:
 
-`TenantScopingTest` also proves, end to end, that: an unauthenticated direct query against `User` fails closed; login still finds a user across tenants via the unscoped provider; a real session cookie through the full HTTP stack (not `actingAs()`, which sets the guard's user directly and would never catch a recursion regression) reaches an authenticated route; and a live Sanctum token can only ever see its own tenant's data, never another's.
+5. Set `CMS_URL`, `CMS_TOKEN` and `REVALIDATE_SECRET` (see its `.env.example`).
+6. `npm run cms:sync` pushes the manifest. The CMS now shows the blocks, pages and collections, ready to edit.
 
-**To use on a future model** (e.g. when you build a `Page` model later):
+The first admin on a fresh install is created with the command below.
 
-```php
-class Page extends Model
-{
-    use \App\Models\Concerns\BelongsToTenant;
-}
-```
+## API (for the frontends)
 
-That's it — `Page::all()`, `Page::where(...)`, etc. are now automatically tenant-scoped, and `Page::create([...])` auto-fills `tenant_id`.
+All under `/api`, JSON only, `Authorization: Bearer <token>`, throttled to 120 requests a minute per token.
 
-**How to verify it:**
-
-```bash
-php artisan test --filter=TenantScopingTest
-```
-
-Or interactively:
-
-```bash
-php artisan tinker
->>> $template = \App\Models\Tenant::where('slug', 'template-site')->first();
->>> // $template->users would itself be fail-closed here: nobody is authenticated yet.
->>> $templateUser = \App\Models\User::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->where('tenant_id', $template->id)->first();
->>> auth()->login($templateUser);
->>> \App\Models\User::count();            // 1 — only the Template Site's user, Globex's is invisible
-```
-
-### 2. Admin panel
-
-Seeded demo users still exist for when the panel's login is built (password `password` for both, from the factory default):
-
-| Tenant | Email | Slug |
+| Method and path | Ability | Returns |
 |---|---|---|
-| Template Site | `admin@template-site.test` | `template-site` |
-| Globex Inc | `admin@globex-inc.test` | `globex-inc` |
+| `GET /api/pages/{slug}` | read | `{data: {slug, title, published_at, blocks: [{type, content}]}}`. Published pages only; visible blocks only |
+| `GET /api/collections/{key}` | read | `{data: [entry, ...]}` of published entries in CMS order |
+| `GET /api/collections/{key}/{slug}` | read | `{data: entry}` |
+| `PUT /api/block-definitions` | sync | Pushes `{blocks, collections?, pages?}`. Additive: never deletes or overwrites edited content |
 
-### 3. API token auth (Sanctum)
+An entry is `{collection, slug, title, ...its fields}`. Block fields: `text`, `textarea`, `richtext`, `image`, `link`, `boolean`, `select`, and (blocks only) `collection`. Revalidate tags sent to the frontend are `page:{slug}` and `collection:{key}`.
 
-- `laravel/sanctum` installed via `php artisan install:api`, which also created `routes/api.php` and registered `api:` routing in `bootstrap/app.php` (currently empty — no endpoints defined per scope).
-- `User` uses `Laravel\Sanctum\HasApiTokens`.
+## Scheduled and manual commands
 
-**Example usage** (once real endpoints exist, a frontend site would):
+- Scheduled commands
+    + None yet. The app has no scheduled commands, so no cron entry is needed, and queues are not used.
+    + If one is added later, the server needs the standard Laravel entry: **\* \* \* \* \* php artisan schedule:run**
 
-```php
-// Issue a token (e.g. from a login endpoint you'll build later)
-$token = $user->createToken('react-frontend')->plainTextToken;
+- Create Admin (cms:create-admin)
+    + Creates an admin user. The way to make the first admin on a new install
+    + Not scheduled; run manually
+    + Prompts for anything not passed. In non-interactive mode with no password, one is generated and printed
+    + Command: **php artisan cms:create-admin --name="Name" --email=you@example.com**
+
+## Verifying
+
+```bash
+php artisan test
+php artisan test --filter=SiteScopingTest   # tenancy, auth, ACL, tokens, media, collections
 ```
 
-```
-GET /api/whatever
-Authorization: Bearer <token>
-```
+`SiteScopingTest` must pass after any change to site scoping, access levels or tokens.
 
-Any route using the `auth:sanctum` middleware will resolve `auth()->user()`, which means the `TenantScope` above applies automatically to API requests too — a token from the Template Site's user can never see Globex's data.
+## Deployment: needs confirmed
 
-### 4. Laravel Boost (dev tooling)
+Hosting is not decided. These need confirming before the first deploy:
 
-Installed per this repo's original setup instructions (now superseded by `AGENTS.md`, which Boost generated with app-specific conventions). Dev-only dependency, not part of the runtime.
+- Hosting target (Laravel Cloud, VPS, ...) and the PHP/Postgres versions it provides: needs confirmed
+- Session and cache drivers: the project convention is the file driver for both, but `.env.example` currently says `database`, and `QUEUE_CONNECTION` is also `database` although queues are not used: needs confirmed
+- Scheduler / cron: nothing to run today (see above): needs confirmed once a scheduled command exists
+- Media disk (`MEDIA_DISK`): `public` locally. Production needs a publicly readable disk that survives deploys (on Laravel Cloud, its object storage), and `APP_URL` correct so image URLs resolve: needs confirmed
+- Database hosting and backups (Postgres), and how often: needs confirmed
+- HTTPS and trusted proxies, so URLs and secure cookies are right behind the host's load balancer: needs confirmed
+- Mail: none is sent today (admins set passwords by hand): needs confirmed if forgot-password is ever added
 
-## TODO / Open decisions
+## Not in the alpha
 
-Not yet settled, and deliberately not written into `CLAUDE.md` until they are:
-
-- **Architecture style** — Controller-only (no Service/Action classes, no Form Requests, inline `processPost()`-style validation) vs idiomatic Laravel (Form Requests, Actions where they earn their keep). Decide once the first real controllers are built.
-- **API contract** — route prefix (`/api` vs root-mounted) and JSON error shapes (validation/abort/500) for `routes/api.php`. Decide once the first public API endpoints are built.
-- **Admin panel conventions** — Livewire component structure, layout, and auth/session wiring for the custom panel, once it's built.
-- **Sanctum API auth notes** — how token auth interacts with tenancy scoping in practice, once real API endpoints exist (ties into the `PersonalAccessToken` bypass already documented above).
+Page create/delete in the CMS, scheduled publishing and revisions, a blog, navigation, global site settings, SEO/OG images, hand-picking individual collection entries, relations between collections, enforcing per-site roles, forgot-password email, image resizing, SVG uploads, and customers managing their own site's users.
