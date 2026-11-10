@@ -40,9 +40,7 @@ class CollectionEntry extends Model
             ->where('key', $this->collection_key)
             ->first();
 
-        $ids = $deleted ? [] : collect($definition?->imageFieldNames() ?? [])
-            ->map(fn (string $field) => Media::idFrom($this->data[$field] ?? null))
-            ->filter()->unique()->values()->all();
+        $ids = $deleted ? [] : Media::idsAt($this->data ?? [], $definition?->imageFieldNames() ?? []);
 
         MediaUsage::syncSubject('collection_entry', $this->id, $this->site_id, $ids);
     }
@@ -101,7 +99,7 @@ class CollectionEntry extends Model
             $content = $entry->data ?? [];
 
             foreach ($definition?->editableFields() ?? [] as $field) {
-                $content[$field['name']] ??= null;
+                $content[$field['name']] ??= $field['type'] === 'repeater' ? [] : null;
             }
 
             return ['content' => $content, 'images' => $definition?->imageFieldNames() ?? []];

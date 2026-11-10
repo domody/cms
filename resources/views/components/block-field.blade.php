@@ -1,10 +1,35 @@
-@props(['field', 'path'])
+@props(['field', 'path', 'value' => []])
 
 <div>
     @if ($field['type'] === 'image')
         <div class="block text-sm font-medium text-gray-700">
             {{ $field['label'] }}@if ($field['required']) <span class="text-red-600">*</span>@endif
             <livewire:media-picker wire:model="{{ $path }}" :key="'media-picker-'.$path" />
+        </div>
+    @elseif ($field['type'] === 'repeater')
+        <div class="space-y-2">
+            <div class="block text-sm font-medium text-gray-700">
+                {{ $field['label'] }}@if ($field['required']) <span class="text-red-600">*</span>@endif
+            </div>
+
+            @foreach ($value as $i => $row)
+                <div wire:key="{{ $path }}-row-{{ $i }}" class="space-y-3 rounded border border-gray-200 bg-gray-50 p-3">
+                    <div class="flex justify-end gap-3 text-xs text-gray-500">
+                        @if ($i > 0)
+                            <button type="button" class="underline" x-on:click="$wire.$set('{{ $path }}', (r => ([r[{{ $i - 1 }}], r[{{ $i }}]] = [r[{{ $i }}], r[{{ $i - 1 }}]], r))([...$wire.$get('{{ $path }}')]))">Up</button>
+                        @endif
+                        @if (! $loop->last)
+                            <button type="button" class="underline" x-on:click="$wire.$set('{{ $path }}', (r => ([r[{{ $i }}], r[{{ $i + 1 }}]] = [r[{{ $i + 1 }}], r[{{ $i }}]], r))([...$wire.$get('{{ $path }}')]))">Down</button>
+                        @endif
+                        <button type="button" class="text-red-600 underline" x-on:click="$wire.$set('{{ $path }}', $wire.$get('{{ $path }}').filter((_, n) => n !== {{ $i }}))">Remove</button>
+                    </div>
+                    @foreach ($field['fields'] as $sub)
+                        <x-block-field :field="$sub" path="{{ $path }}.{{ $i }}.{{ $sub['name'] }}" wire:key="{{ $path }}-{{ $i }}-{{ $sub['name'] }}" />
+                    @endforeach
+                </div>
+            @endforeach
+
+            <button type="button" class="btn" x-on:click="$wire.$set('{{ $path }}', [...($wire.$get('{{ $path }}') ?? []), @js(\App\Models\BlockDefinition::blankRow($field))])">Add item</button>
         </div>
     @elseif ($field['type'] === 'collection')
         <label class="block text-sm font-medium text-gray-700">

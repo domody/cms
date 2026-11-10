@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToSite;
 use App\Models\Concerns\LogsActivity;
 use App\Models\Scopes\CurrentSite;
 use App\Models\Scopes\NoCurrentSiteException;
+use Closure;
 use Database\Factories\MediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -358,33 +359,84 @@ class Media extends Model
     }
 
     /**
-     * Replace the named image fields of each content array with their media
-     * payload (null when unset or not in this site's library), using a single
-     * query for all of them. Array keys are preserved.
+     * The media ids held at the given field paths of a content array (`*`
+     * stands for a repeater's rows, e.g. "gallery.*.image").
+     *
+     * @param  array<string, mixed>  $content
+     * @param  array<int, string>  $paths
+     * @return array<int, int>
+     */
+    public static function idsAt(array $content, array $paths): array
+    {
+        $ids = [];
+
+        foreach ($paths as $path) {
+            self::mapPath($content, explode('.', $path), function ($value) use (&$ids) {
+                if (($id = self::idFrom($value)) !== null) {
+                    $ids[] = $id;
+                }
+
+                return $value;
+            });
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Replace the image fields (paths as in idsAt) of each content array with
+     * their media payload (null when unset or not in this site's library),
+     * using a single query for all of them. Array keys are preserved.
      *
      * @param  array<int|string, array{content: array<string, mixed>, images: array<int, string>}>  $items
      * @return array<int|string, array<string, mixed>>
      */
     public static function resolveImages(array $items): array
     {
-        $ids = collect($items)
-            ->flatMap(fn (array $item) => array_map(fn (string $name) => self::idFrom($item['content'][$name] ?? null), $item['images']))
-            ->filter()
-            ->unique()
-            ->values();
+        $ids = collect($items)->flatMap(fn (array $item) => self::idsAt($item['content'], $item['images']))->unique()->values();
 
         $media = $ids->isEmpty() ? collect() : self::whereIn('id', $ids)->get()->keyBy('id');
 
         return array_map(function (array $item) use ($media): array {
             $content = $item['content'];
 
-            foreach ($item['images'] as $name) {
-                $id = self::idFrom($content[$name] ?? null);
-                $content[$name] = $id === null ? null : $media->get($id)?->toPayload();
+            foreach ($item['images'] as $path) {
+                $content = self::mapPath($content, explode('.', $path), function ($value) use ($media) {
+                    $id = self::idFrom($value);
+
+                    return $id === null ? null : $media->get($id)?->toPayload();
+                });
             }
 
             return $content;
         }, $items);
+    }
+
+    /**
+     * Apply $fn to the value at a path's end, returning the updated tree.
+     * `*` fans out over a list's rows; a missing key ends up null.
+     *
+     * @param  array<int, string>  $segments
+     */
+    private static function mapPath(mixed $node, array $segments, Closure $fn): mixed
+    {
+        if ($segments === []) {
+            return $fn($node);
+        }
+
+        $segment = array_shift($segments);
+
+        if (! is_array($node)) {
+            return $node;
+        }
+
+        if ($segment === '*') {
+            return array_map(fn ($row) => self::mapPath($row, $segments, $fn), $node);
+        }
+
+        $node[$segment] = self::mapPath($node[$segment] ?? null, $segments, $fn);
+
+        return $node;
     }
 
     /**

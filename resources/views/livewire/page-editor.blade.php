@@ -74,7 +74,7 @@
                         @endif
 
                         @foreach ($definition?->fields() ?? [] as $field)
-                            <x-block-field :field="$field" path="blocks.{{ $index }}.content.{{ $field['name'] }}" wire:key="field-{{ $block['id'] }}-{{ $field['name'] }}" />
+                            <x-block-field :field="$field" path="blocks.{{ $index }}.content.{{ $field['name'] }}" :value="$block['content'][$field['name']] ?? []" wire:key="field-{{ $block['id'] }}-{{ $field['name'] }}" />
                         @endforeach
                     </div>
                 </div>

@@ -22,6 +22,8 @@
         @else
             <div class="text-sm italic text-gray-400">empty</div>
         @endif
+    @elseif ($field['type'] === 'repeater')
+        <div class="text-sm text-gray-900">{{ count($value) }} {{ \Illuminate\Support\Str::plural('item', count($value)) }}</div>
     @elseif ($field['type'] === 'boolean')
         <div class="text-sm text-gray-900">{{ $value ? 'Yes' : 'No' }}</div>
     @else

@@ -44,11 +44,11 @@ class Page extends Model
         $definitions = BlockDefinition::withoutGlobalScopes()->where('site_id', $this->site_id)->get()->keyBy('key');
 
         $ids = PageBlock::withoutGlobalScopes()->where('page_id', $this->id)->get()
-            ->flatMap(fn (PageBlock $block) => array_map(
-                fn (string $field) => Media::idFrom($block->content[$field] ?? null),
+            ->flatMap(fn (PageBlock $block) => Media::idsAt(
+                $block->content ?? [],
                 $definitions->get($block->block_key)?->imageFieldNames() ?? [],
             ))
-            ->filter()->unique()->values()->all();
+            ->unique()->values()->all();
 
         MediaUsage::syncSubject('page', $this->id, $this->site_id, $ids);
     }

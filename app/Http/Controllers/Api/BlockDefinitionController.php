@@ -17,11 +17,12 @@ use Illuminate\Validation\ValidationException;
 class BlockDefinitionController extends Controller
 {
     /**
-     * Field types a manifest may declare. `collection` is only valid on blocks.
+     * Field types a manifest may declare. `collection` is only valid on blocks;
+     * `repeater` rows hold the simple types only.
      *
      * @var array<int, string>
      */
-    private const FIELD_TYPES = ['text', 'textarea', 'richtext', 'image', 'link', 'boolean', 'select'];
+    private const FIELD_TYPES = ['text', 'textarea', 'richtext', 'image', 'link', 'boolean', 'select', 'repeater'];
 
     /**
      * Sync the frontend code's manifest into the CMS.
@@ -142,6 +143,13 @@ class BlockDefinitionController extends Controller
     }
 
     /**
+     * Field types allowed inside a repeater's `fields`.
+     *
+     * @var array<int, string>
+     */
+    private const REPEATER_FIELD_TYPES = ['text', 'textarea', 'richtext', 'image', 'link', 'boolean', 'select'];
+
+    /**
      * Rules for a list of field declarations at $prefix (e.g. "blocks.*.fields").
      *
      * @param  array<int, string>  $types
@@ -150,6 +158,10 @@ class BlockDefinitionController extends Controller
     private function fieldRules(string $prefix, array $types): array
     {
         return [
+            ...($types === self::REPEATER_FIELD_TYPES ? [] : [
+                "$prefix.*.fields" => ["required_if:$prefix.*.type,repeater", 'array', 'min:1'],
+                ...$this->fieldRules("$prefix.*.fields", self::REPEATER_FIELD_TYPES),
+            ]),
             "$prefix.*.name" => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9_]+$/'],
             "$prefix.*.type" => ['required', 'string', Rule::in($types)],
             "$prefix.*.label" => ['sometimes', 'nullable', 'string', 'max:255'],

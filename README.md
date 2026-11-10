@@ -85,7 +85,7 @@ All under `/api`, JSON only, `Authorization: Bearer <token>`, throttled to 120 r
 | `GET /api/collections/{key}/{slug}` | read | `{data: entry}` |
 | `PUT /api/block-definitions` | sync | Pushes `{blocks, collections?, pages?}`. Additive: never deletes or overwrites edited content |
 
-An entry is `{collection, slug, title, ...its fields}`. Block fields: `text`, `textarea`, `richtext`, `image`, `link`, `boolean`, `select`, and (blocks only) `collection`. Revalidate tags sent to the frontend are `page:{slug}` and `collection:{key}`.
+An entry is `{collection, slug, title, ...its fields}`. Block fields: `text`, `textarea`, `richtext`, `image`, `link`, `boolean`, `select`, `repeater` (a list of rows; declare the row's simple fields under `fields`, e.g. `{name: 'itinerary', type: 'repeater', fields: [{name: 'title', type: 'text'}, {name: 'body', type: 'textarea'}]}`; it comes back as an array of objects, image sub-fields resolved), and (blocks only) `collection`. Revalidate tags sent to the frontend are `page:{slug}` and `collection:{key}`.
 
 ## Scheduled and manual commands
 

@@ -25,7 +25,7 @@
     @if ($this->definition->editableFields() !== [])
         <div class="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
             @foreach ($this->definition->editableFields() as $field)
-                <x-block-field :field="$field" path="data.{{ $field['name'] }}" wire:key="field-{{ $field['name'] }}" />
+                <x-block-field :field="$field" path="data.{{ $field['name'] }}" :value="$data[$field['name']] ?? []" wire:key="field-{{ $field['name'] }}" />
             @endforeach
         </div>
     @endif
