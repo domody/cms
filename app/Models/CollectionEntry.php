@@ -94,15 +94,19 @@ class CollectionEntry extends Model
     {
         $definitions = CollectionDefinition::all()->keyBy('key');
 
+        // The manifest is the source of truth: entries of a collection it no
+        // longer declares are not served, and neither are stored keys it dropped.
+        $entries = $entries->filter(fn (CollectionEntry $entry) => $definitions->has($entry->collection_key))->values();
+
         $items = $entries->map(function (CollectionEntry $entry) use ($definitions): array {
             $definition = $definitions->get($entry->collection_key);
-            $content = $entry->data ?? [];
+            $content = $definition->declaredContent($entry->data ?? []);
 
-            foreach ($definition?->editableFields() ?? [] as $field) {
+            foreach ($definition->editableFields() as $field) {
                 $content[$field['name']] ??= $field['type'] === 'repeater' ? [] : null;
             }
 
-            return ['content' => $content, 'images' => $definition?->imageFieldNames() ?? []];
+            return ['content' => $content, 'images' => $definition->imageFieldNames()];
         })->all();
 
         $resolved = Media::resolveImages($items);

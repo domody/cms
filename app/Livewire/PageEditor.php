@@ -139,7 +139,7 @@ class PageEditor extends Component
             throw $e;
         }
 
-        $previousOrder = $rows->sortBy('position')->keys()->values()->all();
+        $previousOrder = $rows->filter(fn (PageBlock $row) => $this->definitionFor($row) !== null)->sortBy('position')->keys()->values()->all();
 
         DB::transaction(function () use ($page, $rows): void {
             $page->update([
@@ -158,7 +158,7 @@ class PageEditor extends Component
                 }
 
                 $definition = $this->definitionFor($row);
-                $content = $definition?->normalizedContent($row->content ?? [], $state['content']) ?? $row->content ?? [];
+                $content = $definition?->normalizedContent($state['content']) ?? $row->content ?? [];
 
                 $row->update([
                     'position' => $position++,
@@ -192,13 +192,16 @@ class PageEditor extends Component
 
         $this->title = $page->title;
         $this->status = $page->status;
+        // Blocks whose type the manifest no longer declares are hidden.
         $this->blocks = $page->blocks
+            ->filter(fn (PageBlock $block) => $this->definitionFor($block) !== null)
             ->map(fn (PageBlock $block) => [
                 'id' => $block->id,
                 'block_key' => $block->block_key,
                 'is_visible' => $block->is_visible,
-                'content' => $this->definitionFor($block)?->contentWithBlanks($block->content ?? []) ?? $block->content ?? [],
+                'content' => $this->definitionFor($block)->contentWithBlanks($block->content ?? []),
             ])
+            ->values()
             ->all();
     }
 

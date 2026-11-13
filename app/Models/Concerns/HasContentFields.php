@@ -16,7 +16,9 @@ use Illuminate\Validation\Rule;
  * `repeater` - an ordered list of rows, each holding the values of the
  * `fields` declared under it (the simple types; no nested repeaters) -
  * and `collection` (blocks only) - stores the key of a collection the editor
- * picked; the API swaps it for that collection's published entries.
+ * picked; the API swaps it for that collection's published entries. A
+ * collection field can be locked to one collection by declaring `collection`
+ * (the key): the editor can't pick another, and the stored value is ignored.
  *
  * @property array<int, array<string, mixed>>|null $schema
  */
@@ -25,7 +27,7 @@ trait HasContentFields
     /**
      * The schema's fields with defaults filled in.
      *
-     * @return array<int, array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, fields: array<int, mixed>}>
+     * @return array<int, array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, collection: string|null, fields: array<int, mixed>}>
      */
     public function fields(): array
     {
@@ -34,7 +36,7 @@ trait HasContentFields
 
     /**
      * @param  array<string, mixed>  $field
-     * @return array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, fields: array<int, mixed>}
+     * @return array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, collection: string|null, fields: array<int, mixed>}
      */
     private static function normalizeField(array $field): array
     {
@@ -45,6 +47,7 @@ trait HasContentFields
             'required' => (bool) ($field['required'] ?? false),
             'options' => $field['options'] ?? [],
             'limit' => isset($field['limit']) ? (int) $field['limit'] : null,
+            'collection' => $field['type'] === 'collection' ? ($field['collection'] ?? null) : null,
             'fields' => $field['type'] === 'repeater' ? array_map(self::normalizeField(...), $field['fields'] ?? []) : [],
         ];
     }
@@ -52,7 +55,7 @@ trait HasContentFields
     /**
      * Fields that hold a value the editor can change (all of them).
      *
-     * @return array<int, array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, fields: array<int, mixed>}>
+     * @return array<int, array{name: string, type: string, label: string, required: bool, options: array<int, string>, limit: int|null, collection: string|null, fields: array<int, mixed>}>
      */
     public function editableFields(): array
     {
@@ -135,11 +138,13 @@ trait HasContentFields
                     break;
                 case 'collection':
                     // Like images, the exists rule ignores SiteScope.
-                    $rules[$path] = [
-                        $presence,
-                        'string',
-                        Rule::exists('collection_definitions', 'key')->where('site_id', app(CurrentSite::class)->id()),
-                    ];
+                    $rules[$path] = $field['collection'] !== null
+                        ? ['nullable', 'in:'.$field['collection']]
+                        : [
+                            $presence,
+                            'string',
+                            Rule::exists('collection_definitions', 'key')->where('site_id', app(CurrentSite::class)->id()),
+                        ];
 
                     break;
                 case 'repeater':
@@ -164,8 +169,9 @@ trait HasContentFields
     }
 
     /**
-     * Stored content with a key for every editable field, so a form always
-     * has something to bind to (e.g. after a field was added in code).
+     * Stored content with a key for every editable field (and only those), so
+     * a form always has something to bind to (e.g. after a field was added in
+     * code).
      *
      * @param  array<string, mixed>  $content
      * @return array<string, mixed>
@@ -182,12 +188,15 @@ trait HasContentFields
      */
     private static function withBlanks(array $fields, array $content): array
     {
+        $blanked = [];
+
         foreach ($fields as $field) {
             $value = $content[$field['name']] ?? self::blankValue($field['type']);
 
-            $content[$field['name']] = match ($field['type']) {
+            $blanked[$field['name']] = match ($field['type']) {
                 'link' => ['label' => $value['label'] ?? null, 'url' => $value['url'] ?? null],
                 'image' => Media::idFrom($value),
+                'collection' => $field['collection'] ?? $value,
                 'repeater' => array_map(
                     fn ($row) => self::withBlanks($field['fields'], is_array($row) ? $row : []),
                     is_array($value) ? array_values($value) : [],
@@ -196,38 +205,111 @@ trait HasContentFields
             };
         }
 
-        return $content;
+        return $blanked;
     }
 
     /**
-     * Merge submitted form state over stored content. Keys the schema no
-     * longer declares are kept.
+     * Submitted form state in the form it is stored. The manifest is the
+     * source of truth, so keys the schema doesn't declare are dropped.
      *
-     * @param  array<string, mixed>  $stored
      * @param  array<string, mixed>  $submitted
      * @return array<string, mixed>
      */
-    public function normalizedContent(array $stored, array $submitted): array
+    public function normalizedContent(array $submitted): array
     {
-        return self::normalizeFields($this->editableFields(), $stored, $submitted);
+        return self::normalizeFields($this->editableFields(), $submitted);
     }
 
     /**
      * @param  array<int, array<string, mixed>>  $fields
-     * @param  array<string, mixed>  $stored
      * @param  array<string, mixed>  $submitted
      * @return array<string, mixed>
      */
-    private static function normalizeFields(array $fields, array $stored, array $submitted): array
+    private static function normalizeFields(array $fields, array $submitted): array
     {
+        $normalized = [];
+
         foreach ($fields as $field) {
-            $stored[$field['name']] = self::normalizeValue(
+            $normalized[$field['name']] = self::normalizeValue(
                 $field,
                 $submitted[$field['name']] ?? self::blankValue($field['type']),
             );
         }
 
-        return $stored;
+        return $normalized;
+    }
+
+    /**
+     * Stored content without the keys the schema no longer declares (the
+     * manifest is the source of truth), at any depth of a repeater.
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    public function declaredContent(array $content): array
+    {
+        return self::onlyDeclared($this->fields(), $content);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $fields
+     * @param  array<string, mixed>  $content
+     * @return array<string, mixed>
+     */
+    private static function onlyDeclared(array $fields, array $content): array
+    {
+        $declared = [];
+
+        foreach ($fields as $field) {
+            if (! array_key_exists($field['name'], $content)) {
+                continue;
+            }
+
+            $value = $content[$field['name']];
+
+            $declared[$field['name']] = $field['type'] === 'repeater' && is_array($value)
+                ? array_map(fn ($row) => is_array($row) ? self::onlyDeclared($field['fields'], $row) : $row, $value)
+                : $value;
+        }
+
+        return $declared;
+    }
+
+    /**
+     * Dotted paths of stored keys the schema no longer declares; `*` stands
+     * for a repeater's rows (e.g. "key_viewpoints", "gallery.*.caption").
+     *
+     * @param  array<string, mixed>  $content
+     * @return array<int, string>
+     */
+    public function undeclaredPaths(array $content): array
+    {
+        return self::strayPaths($this->fields(), $content);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $fields
+     * @param  array<string, mixed>  $content
+     * @return array<int, string>
+     */
+    private static function strayPaths(array $fields, array $content, string $prefix = ''): array
+    {
+        $names = array_column($fields, 'name');
+        $paths = array_map(fn ($key) => $prefix.$key, array_values(array_diff(array_keys($content), $names)));
+
+        foreach ($fields as $field) {
+            if ($field['type'] !== 'repeater' || ! is_array($content[$field['name']] ?? null)) {
+                continue;
+            }
+
+            foreach ($content[$field['name']] as $row) {
+                if (is_array($row)) {
+                    array_push($paths, ...self::strayPaths($field['fields'], $row, "$prefix{$field['name']}.*."));
+                }
+            }
+        }
+
+        return array_values(array_unique($paths));
     }
 
     /**
@@ -274,6 +356,10 @@ trait HasContentFields
             return Media::idFrom($value);
         }
 
+        if ($type === 'collection' && $field['collection'] !== null) {
+            return $field['collection'];
+        }
+
         if ($type === 'link') {
             $label = filled($value['label'] ?? null) ? trim($value['label']) : null;
             $url = filled($value['url'] ?? null) ? trim($value['url']) : null;
@@ -283,7 +369,7 @@ trait HasContentFields
 
         if ($type === 'repeater') {
             $rows = array_map(
-                fn ($row) => self::normalizeFields($field['fields'], [], is_array($row) ? $row : []),
+                fn ($row) => self::normalizeFields($field['fields'], is_array($row) ? $row : []),
                 is_array($value) ? $value : [],
             );
 

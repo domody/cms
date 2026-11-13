@@ -31,6 +31,14 @@
 
             <button type="button" class="btn" x-on:click="$wire.$set('{{ $path }}', [...($wire.$get('{{ $path }}') ?? []), @js(\App\Models\BlockDefinition::blankRow($field))])">Add item</button>
         </div>
+    @elseif ($field['type'] === 'collection' && $field['collection'])
+        <div class="block text-sm font-medium text-gray-700">
+            {{ $field['label'] }}
+            <span class="mt-1 block text-xs font-normal text-gray-500">
+                Always shows the published entries of
+                <a href="{{ route('collections.show', ['collection' => $field['collection']]) }}" class="underline">{{ \App\Models\CollectionDefinition::where('key', $field['collection'])->value('label') ?? $field['collection'] }}</a>@if ($field['limit']) (first {{ $field['limit'] }}) @endif.
+            </span>
+        </div>
     @elseif ($field['type'] === 'collection')
         <label class="block text-sm font-medium text-gray-700">
             {{ $field['label'] }}@if ($field['required']) <span class="text-red-600">*</span>@endif

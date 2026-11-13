@@ -91,7 +91,7 @@ class CollectionEntryEditor extends Component
             'title' => trim($this->title),
             'slug' => filled($this->slug) ? $this->slug : CollectionEntry::uniqueSlug($definition->key, $this->title, $entry?->id),
             'status' => $this->status,
-            'data' => $definition->normalizedContent($entry?->data ?? [], $this->data),
+            'data' => $definition->normalizedContent($this->data),
         ];
 
         $site = app(CurrentSite::class)->get();

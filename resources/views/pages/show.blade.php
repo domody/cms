@@ -33,7 +33,7 @@
                         <p class="text-sm text-amber-700">No definition synced for this block type.</p>
                     @endif
                     @foreach ($definition?->fields() ?? [] as $field)
-                        <x-block-preview :field="$field" :value="$block->content[$field['name']] ?? null" />
+                        <x-block-preview :field="$field" :value="$field['collection'] ?? ($block->content[$field['name']] ?? null)" />
                     @endforeach
                 </div>
             </section>

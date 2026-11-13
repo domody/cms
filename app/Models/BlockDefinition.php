@@ -35,8 +35,9 @@ class BlockDefinition extends Model
     /**
      * Blocks in the shape handed to frontends, {type, content}. Image fields
      * are resolved from media ids to {url, alt, width, height}, and
-     * `collection` fields (which store a collection key) are filled with that
-     * collection's published entries, or an empty list if none is chosen.
+     * `collection` fields (which store a collection key, or are locked to the
+     * one the field declares) are filled with that collection's published
+     * entries, or an empty list if none is chosen.
      *
      * @param  Collection<int, PageBlock>  $blocks
      * @return Collection<int, array{type: string, content: array<string, mixed>}>
@@ -45,9 +46,13 @@ class BlockDefinition extends Model
     {
         $definitions = static::all()->keyBy('key');
 
+        // The manifest is the source of truth: blocks of a type it no longer
+        // declares are not served, and neither are stored keys it dropped.
+        $blocks = $blocks->filter(fn (PageBlock $block) => $definitions->has($block->block_key))->values();
+
         $items = $blocks->map(fn (PageBlock $block): array => [
-            'content' => $block->content ?? [],
-            'images' => $definitions->get($block->block_key)?->imageFieldNames() ?? [],
+            'content' => $definitions->get($block->block_key)->declaredContent($block->content ?? []),
+            'images' => $definitions->get($block->block_key)->imageFieldNames(),
         ])->all();
 
         $resolved = Media::resolveImages($items);
@@ -56,9 +61,9 @@ class BlockDefinition extends Model
         return $blocks->map(function (PageBlock $block, int $index) use ($definitions, $resolved, &$entries): array {
             $content = $resolved[$index];
 
-            foreach ($definitions->get($block->block_key)?->fields() ?? [] as $field) {
+            foreach ($definitions->get($block->block_key)->fields() as $field) {
                 if ($field['type'] === 'collection') {
-                    $key = $content[$field['name']] ?? null;
+                    $key = $field['collection'] ?? $content[$field['name']] ?? null;
                     $list = is_string($key) && $key !== '' ? $entries[$key] ??= CollectionEntry::publishedPayloads($key) : [];
                     $content[$field['name']] = $field['limit'] === null ? $list : array_slice($list, 0, $field['limit']);
                 }

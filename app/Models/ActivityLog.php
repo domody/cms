@@ -34,6 +34,7 @@ class ActivityLog extends Model
         'media' => 'Media',
         'media_folder' => 'Media folder',
         'user' => 'Member',
+        'manifest' => 'Manifest',
     ];
 
     /** Longest value kept in a diff, so a long text doesn't bloat the table. */

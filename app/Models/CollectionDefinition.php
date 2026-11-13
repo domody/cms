@@ -51,13 +51,15 @@ class CollectionDefinition extends Model
     {
         $collectionFields = BlockDefinition::all()
             ->mapWithKeys(fn (BlockDefinition $block) => [
-                $block->key => collect($block->fields())->where('type', 'collection')->pluck('name')->all(),
+                $block->key => collect($block->fields())->where('type', 'collection')
+                    ->map(fn (array $field) => ['name' => $field['name'], 'collection' => $field['collection']])
+                    ->values()->all(),
             ])
             ->filter();
 
         $pageIds = PageBlock::whereIn('block_key', $collectionFields->keys())->get()
             ->filter(fn (PageBlock $block) => collect($collectionFields[$block->block_key])
-                ->contains(fn (string $name) => ($block->content[$name] ?? null) === $key))
+                ->contains(fn (array $field) => ($field['collection'] ?? $block->content[$field['name']] ?? null) === $key))
             ->pluck('page_id');
 
         $pageSlugs = Page::whereIn('id', $pageIds)->pluck('slug');
