@@ -52,11 +52,7 @@
                     {{ $log->actor() }}
                     @if ($log->source !== 'web') <x-badge class="ms-1">{{ $log->source }}</x-badge> @endif
                 </td>
-                <td>
-                    <span class="font-medium">{{ \Illuminate\Support\Str::headline($log->event) }}</span>
-                    <span class="text-secondary-foreground">{{ strtolower(\App\Models\ActivityLog::typeLabel($log->subject_type)) }}</span>
-                    <span class="font-medium">{{ $log->subject_label }}</span>
-                </td>
+                <td><x-activity-summary :log="$log" /></td>
                 <td class="space-y-1">
                     @foreach ($log->changes ?? [] as $field => $change)
                         {{-- Long values (repeater JSON) are clamped; click to read the whole change. --}}

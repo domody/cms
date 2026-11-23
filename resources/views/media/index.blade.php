@@ -5,26 +5,8 @@
     ],
 ])
 
-@php
-    $percent = $storageLimit ? min(100, round($storageUsed / $storageLimit * 100)) : null;
-@endphp
-
 @section('headerActions')
-    <div class="w-56 text-xs text-secondary-foreground">
-        <div class="flex justify-between gap-2">
-            @if ($storageLimit)
-                <span>{{ \App\Models\Media::formatBytes($storageUsed) }} used of {{ \App\Models\Media::formatBytes($storageLimit) }}</span>
-            @else
-                <span>{{ \App\Models\Media::formatBytes($storageUsed) }} used</span>
-                <span>No limit</span>
-            @endif
-        </div>
-        @if ($percent !== null)
-            <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div class="h-full {{ $percent >= 90 ? 'bg-danger' : 'bg-foreground' }}" style="width: {{ $percent }}%"></div>
-            </div>
-        @endif
-    </div>
+    <x-usage-meter :used="$storageUsed" :limit="$storageLimit" class="w-56" />
     <x-media-upload-modal :folder="$folder" :extensions="$extensions" :max-megabytes="$maxMegabytes" />
 @endsection
 

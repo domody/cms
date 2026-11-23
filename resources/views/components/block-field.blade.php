@@ -46,7 +46,7 @@
         <x-field as="div" :label="$field['label']" :hide-label="$bare" :required="$field['required']" :error-keys="[$path, $path.'.label', $path.'.url']">
             <div class="grid gap-2 sm:grid-cols-2">
                 <input type="text" wire:model="{{ $path }}.label" placeholder="Button text" aria-label="{{ $field['label'] }} text" class="input">
-                <input type="text" wire:model="{{ $path }}.url" placeholder="https://â€¦ or /page" aria-label="{{ $field['label'] }} URL" class="input">
+                <input type="text" wire:model="{{ $path }}.url" placeholder="https://... or /page" aria-label="{{ $field['label'] }} URL" class="input">
             </div>
         </x-field>
     @else

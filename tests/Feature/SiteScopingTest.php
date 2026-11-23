@@ -756,7 +756,21 @@ class SiteScopingTest extends TestCase
 
     public function test_an_admin_reaches_the_admin_area(): void
     {
-        $this->actingAs(User::factory()->admin()->create())->get('/admin/dashboard')->assertOk();
+        Site::factory()->create(['name' => 'Listed Site']);
+
+        $this->actingAs(User::factory()->admin()->create())->get('/admin/dashboard')->assertOk()->assertSee('Listed Site');
+    }
+
+    public function test_the_site_dashboard_shows_activity_and_members_only_to_those_who_manage_the_site(): void
+    {
+        $site = Site::factory()->create(['slug' => 'client-site']);
+        $editor = User::factory()->create();
+        $owner = User::factory()->create();
+        $site->users()->attach($editor, ['role' => SiteRole::EDITOR]);
+        $site->users()->attach($owner, ['role' => SiteRole::OWNER]);
+
+        $this->actingAs($editor)->get('/client-site/dashboard')->assertOk()->assertDontSee('Recent activity')->assertDontSee('Members');
+        $this->actingAs($owner)->get('/client-site/dashboard')->assertOk()->assertSee('Recent activity')->assertSee('Members');
     }
 
     public function test_an_admin_sees_every_site_and_user_with_roles_in_the_admin_lists(): void
