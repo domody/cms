@@ -33,7 +33,14 @@
             </tr>
         @empty
             <tr>
-                <td colspan="4" class="empty">No users yet.</td>
+                <td colspan="4">
+                    <x-empty-state figure="keyboard" title="No users yet">
+                        Get started and invite your first team member.
+                        <x-slot:actions>
+                            <x-button icon="add-01" :href="route('users.create')">Add user</x-button>
+                        </x-slot:actions>
+                    </x-empty-state>
+                </td>
             </tr>
         @endforelse
     </x-table>

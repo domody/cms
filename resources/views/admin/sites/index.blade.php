@@ -31,7 +31,14 @@
             </tr>
         @empty
             <tr>
-                <td colspan="3" class="empty">No sites yet.</td>
+                <td colspan="3">
+                    <x-empty-state figure="hub" title="No sites yet">
+                        Get started and add your first client site.
+                        <x-slot:actions>
+                            <x-button icon="add-01" :href="route('admin.sites.create')">Add site</x-button>
+                        </x-slot:actions>
+                    </x-empty-state>
+                </td>
             </tr>
         @endforelse
     </x-table>

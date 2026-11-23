@@ -23,7 +23,9 @@
                 {{ $site->name }}
             </a>
         @empty
-            <div class="px-3 py-2 text-sm text-secondary-foreground">No sites</div>
+            <x-empty-state figure="router" title="No sites yet">
+                You'll see sites here once you're added to one.
+            </x-empty-state>
         @endforelse
     </div>
 </div>

@@ -9,8 +9,8 @@
 
 @section('content')
     @if ($collections->isEmpty())
-        <x-empty-state icon="folder-01" title="No collections yet">
-            Sync your frontend manifest to create them.
+        <x-empty-state figure="cabinet" title="No collections yet">
+            Collections appear once your frontend declares them.
         </x-empty-state>
     @else
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -62,9 +62,11 @@
 
             @php($library = $this->library)
             @if ($library->isEmpty())
-                <x-empty-state icon="image-01">
-                    {{ $search !== '' || $folder !== '' ? 'No images match.' : 'No images yet. Upload one above.' }}
-                </x-empty-state>
+                @if ($search !== '' || $folder !== '')
+                    <x-empty-state figure="loupe" title="No images match">Try a different search or folder.</x-empty-state>
+                @else
+                    <x-empty-state figure="drawer" title="No images yet">Upload your first image to start your library.</x-empty-state>
+                @endif
             @else
                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     @foreach ($library->take($limit) as $item)

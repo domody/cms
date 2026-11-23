@@ -39,6 +39,9 @@
     /* Lines */
     --border: oklch(0.714 0.0261 293.38 / 25%);
     --ring: oklch(0.714 0.0261 293.38 / 25%);
+
+    /* Hairline figures: the plate must match the surface they sit on. */
+    --hairline-plate: var(--background);
 }
 
 .dark {

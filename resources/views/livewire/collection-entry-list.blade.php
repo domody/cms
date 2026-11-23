@@ -1,7 +1,10 @@
 <div>
     @if ($this->entries->isEmpty())
-        <x-empty-state icon="folder-01" title="No entries yet">
-            Use "Add entry" to create the first one.
+        <x-empty-state figure="sieve" title="No entries yet">
+            Get started and create your first entry.
+            <x-slot:actions>
+                <x-button icon="add-01" :href="route('collections.create', ['collection' => $this->definition->key])">Add entry</x-button>
+            </x-slot:actions>
         </x-empty-state>
     @else
         <x-card :flush="true">

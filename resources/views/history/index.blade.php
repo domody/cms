@@ -71,7 +71,11 @@
             </tr>
         @empty
             <tr>
-                <td colspan="4" class="empty">Nothing recorded yet.</td>
+                <td colspan="4">
+                    <x-empty-state figure="rail" title="No activity yet">
+                        Changes made on this site will show up here.
+                    </x-empty-state>
+                </td>
             </tr>
         @endforelse
     </x-table>

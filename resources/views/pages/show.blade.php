@@ -41,7 +41,9 @@
                 </div>
             </x-card>
         @empty
-            <x-empty-state icon="file-01">This page has no blocks.</x-empty-state>
+            <x-empty-state figure="exploded" title="No blocks yet">
+                Blocks appear once your frontend declares them for this page.
+            </x-empty-state>
         @endforelse
 
         <details class="rounded-xl ring-1 ring-border">

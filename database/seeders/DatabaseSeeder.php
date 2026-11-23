@@ -2,6 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\BlockDefinition;
+use App\Models\CollectionDefinition;
+use App\Models\MediaFolder;
+use App\Models\Page;
+use App\Models\PageBlock;
 use App\Models\Site;
 use App\Models\SitePlan;
 use App\Models\SiteRole;
@@ -82,6 +87,84 @@ class DatabaseSeeder extends Seeder
             $site = Site::factory()->plan($plan)->create(['name' => $name, 'slug' => $slug]);
 
             $customer->sites()->attach($site->id, ['role' => $role]);
+
+            match ($slug) {
+                'birch-studio' => $this->seedBirchStudio($site),
+                'cedar-dental' => $this->seedCedarDental($site),
+                default => null, // Acme Bakery stays a brand-new, empty site.
+            };
         }
+
+        // A site with no members and no token (admin views of site.show and
+        // users.index), and a customer who belongs to no site.
+        Site::factory()->plan(SitePlan::STARTER)->create(['name' => 'Dunmore Garage', 'slug' => 'dunmore-garage']);
+
+        User::factory()->create(['name' => 'Orphan Customer', 'email' => 'orphan@cms.test']);
+    }
+
+    /**
+     * Birch Studio (customer is an admin): a media library holding only an
+     * empty folder, so media.index shows "No images here yet".
+     */
+    private function seedBirchStudio(Site $site): void
+    {
+        MediaFolder::create(['site_id' => $site->id, 'name' => 'Photoshoots']);
+    }
+
+    /**
+     * Cedar Dental (customer is an editor): pages and collections that exist
+     * but hold nothing, for the empty states inside them. No media is seeded,
+     * so the image picker's library is empty too.
+     */
+    private function seedCedarDental(Site $site): void
+    {
+        BlockDefinition::factory()->create([
+            'site_id' => $site->id,
+            'key' => 'hero',
+            'label' => 'Hero',
+            'schema' => [
+                ['name' => 'headline', 'type' => 'text', 'required' => true],
+                ['name' => 'image', 'type' => 'image'],
+            ],
+        ]);
+
+        BlockDefinition::factory()->create([
+            'site_id' => $site->id,
+            'key' => 'gallery',
+            'label' => 'Gallery',
+            'schema' => [
+                ['name' => 'photos', 'type' => 'repeater', 'label' => 'Photos', 'fields' => [['name' => 'photo', 'type' => 'image']]],
+            ],
+        ]);
+
+        $home = Page::factory()->published()->create(['site_id' => $site->id, 'slug' => 'home', 'title' => 'Home']);
+        PageBlock::factory()->create([
+            'site_id' => $site->id,
+            'page_id' => $home->id,
+            'content' => ['headline' => 'Gentle care for the whole family'],
+        ]);
+
+        // A page with no blocks: pages.show / the page editor's block list.
+        Page::factory()->create(['site_id' => $site->id, 'slug' => 'about', 'title' => 'About']);
+
+        // A block whose repeater has no rows: the repeater's empty state.
+        $gallery = Page::factory()->create(['site_id' => $site->id, 'slug' => 'gallery', 'title' => 'Gallery']);
+        PageBlock::factory()->create([
+            'site_id' => $site->id,
+            'page_id' => $gallery->id,
+            'block_key' => 'gallery',
+            'content' => ['photos' => []],
+        ]);
+
+        // A collection with no entries: collections.show's empty state.
+        CollectionDefinition::factory()->create([
+            'site_id' => $site->id,
+            'key' => 'team',
+            'label' => 'Team',
+            'schema' => [
+                ['name' => 'role', 'type' => 'text'],
+                ['name' => 'photo', 'type' => 'image'],
+            ],
+        ]);
     }
 }

@@ -64,7 +64,11 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="empty">No members yet.</td></tr>
+                        <tr><td>
+                            <x-empty-state figure="lockers" title="No members yet">
+                                Give your client's team access to this site.
+                            </x-empty-state>
+                        </td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -114,7 +118,11 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td class="empty">No tokens yet.</td></tr>
+                        <tr><td>
+                            <x-empty-state figure="padlock" title="No tokens yet">
+                                Create a token to let your frontend read this site's content.
+                            </x-empty-state>
+                        </td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -62,7 +62,9 @@
                     {!! \App\Models\SiteRole::badge($site->pivot->role) !!}
                 </div>
             @empty
-                <p class="px-5 py-6 text-center text-sm text-secondary-foreground">Not a member of any site. Add them from a site's page.</p>
+                <x-empty-state figure="plug" title="No sites yet">
+                    Give this user access to a site to get them started.
+                </x-empty-state>
             @endforelse
         </x-card>
 

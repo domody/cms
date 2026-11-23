@@ -43,7 +43,9 @@
     </div>
 
     @if (count($value) === 0)
-        <p class="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-secondary-foreground">No items yet.</p>
+        <x-empty-state figure="basket" title="No items yet" class="rounded-lg border border-dashed">
+            Add your first item to get started.
+        </x-empty-state>
     @else
         <ol @class([
             'grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4' => $layout === 'grid',

@@ -1,8 +1,8 @@
 @props(['item' => null, 'usages' => collect(), 'folderPaths', 'canDelete' => false])
 
 @if ($item === null)
-    <x-empty-state icon="image-01" title="No image selected" aria-label="Image details" class="w-full shrink-0 bg-muted lg:w-80">
-        Pick an image to edit its alt text, move it, see where it's used or replace the file.
+    <x-empty-state figure="loupe" title="No image selected" aria-label="Image details" class="w-full shrink-0 bg-muted lg:w-80">
+        Pick an image to see its details.
     </x-empty-state>
 @else
     <aside aria-label="Image details" class="w-full shrink-0 overflow-hidden rounded-xl bg-background ring-1 ring-border lg:sticky lg:top-20 lg:w-80">

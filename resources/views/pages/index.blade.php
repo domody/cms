@@ -28,7 +28,11 @@
             </tr>
         @empty
             <tr>
-                <td colspan="4" class="empty">No pages yet. Sync your frontend manifest to create them.</td>
+                <td colspan="4">
+                    <x-empty-state figure="stack" title="No pages yet">
+                        Pages appear once your frontend declares them.
+                    </x-empty-state>
+                </td>
             </tr>
         @endforelse
     </x-table>

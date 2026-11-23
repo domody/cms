@@ -123,15 +123,13 @@
 
         {{-- Media items --}}
         @if ($media->isEmpty())
-            <x-empty-state icon="image-01">
-                @if ($search !== '')
-                    No images match your search.
-                @elseif ($folders->isNotEmpty())
-                    No images directly in {{ $folder?->name ?? 'the library' }}. Open a folder above.
-                @else
-                    No images here yet. Upload one above.
-                @endif
-            </x-empty-state>
+            @if ($search !== '')
+                <x-empty-state figure="loupe" title="No images match">Try a different search.</x-empty-state>
+            @elseif ($folders->isNotEmpty())
+                <x-empty-state figure="drawer" title="No images here yet">Open a folder or upload one.</x-empty-state>
+            @else
+                <x-empty-state figure="drawer" title="No images yet">Upload your first image to start your library.</x-empty-state>
+            @endif
         @else
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($media as $item)

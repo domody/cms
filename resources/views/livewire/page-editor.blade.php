@@ -54,7 +54,11 @@
                         <x-icon-button icon="grip-vertical" label="Drag to reorder" wire:sort:handle class="cursor-grab text-muted-foreground active:cursor-grabbing" />
                     </li>
                 @empty
-                    <li class="px-3 py-6 text-center text-sm text-secondary-foreground">This page has no blocks.</li>
+                    <li>
+                        <x-empty-state figure="exploded" title="No blocks yet">
+                            Blocks appear once your frontend declares them for this page.
+                        </x-empty-state>
+                    </li>
                 @endforelse
             </ol>
         </x-card>
