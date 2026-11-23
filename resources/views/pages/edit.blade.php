@@ -1,7 +1,7 @@
 @extends('layouts.admin', [
-    'title' => 'Edit /'.$page->slug,
-    'pageTitle' => 'Edit /'.$page->slug,
-    'pageDescription' => $page->title,
+    'title' => 'Edit '.$page->title,
+    'pageTitle' => $page->title,
+    'pageDescription' => '/'.$page->slug,
     'breadcrumbs' => [
         ['label' => 'Pages', 'route' => route('pages.index')],
         ['label' => $page->title, 'route' => route('pages.show', $page)],
@@ -10,13 +10,9 @@
 ])
 
 @section('pageActions')
-    <div class="flex items-center gap-3">
-        <a href="{{ route('history.index', ['type' => 'page', 'subject' => $page->id]) }}" class="text-sm text-gray-600 hover:text-gray-900">History</a>
-        <a href="{{ route('pages.show', $page) }}" class="text-sm text-gray-600 hover:text-gray-900">View page</a>
-        <button type="submit" form="page-editor-form" class="btn">
-            Save changes
-        </button>
-    </div>
+    <x-button variant="subtle" icon="clock-01" :href="route('history.index', ['type' => 'page', 'subject' => $page->id])">History</x-button>
+    <x-button variant="subtle" icon="view" :href="route('pages.show', $page)">Preview</x-button>
+    <x-button type="submit" form="page-editor-form">Save changes</x-button>
 @endsection
 
 @section('content')

@@ -1,83 +1,81 @@
-<form id="page-editor-form" data-unsaved-guard wire:submit="save" class="space-y-4">
-    <div class="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:grid-cols-3">
-        <label class="block text-sm font-medium text-gray-700 sm:col-span-2">
-            Title
-            <input type="text" wire:model="title" class="input mt-1">
-            @error('title') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-        <label class="block text-sm font-medium text-gray-700">
-            Status
-            <select wire:model="status" class="input mt-1">
-                @foreach (\App\Models\PageStatus::options() as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            @error('status') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-    </div>
-
-    <div class="flex gap-4 items-start justify-start">
-        <div class="rounded-lg border border-gray-200 bg-white flex-1">
-            <div class="border-b border-gray-100 px-4 py-3">
-                <h2 class="text-sm font-semibold text-gray-900">Page Structure</h2>
-            </div>
-
-            <div wire:sort="sortBlock">
-            @forelse ($blocks as $index => $block)
-                @php
-                    $definition = $this->definitions->get($block['block_key']);
-                    $fieldErrors = collect($errors->keys())->contains(fn ($key) => str_starts_with($key, "blocks.$index."));
-                    $isSelected = $block['id'] === $selectedBlockId;
-                @endphp
-                <div
-                    wire:key="block-{{ $block['id'] }}"
-                    wire:sort:item="{{ $block['id'] }}"
-                    class="flex items-center gap-2 px-3 py-1.5 {{ $loop->last ? '' : 'border-b border-gray-100' }} {{ $isSelected ? 'bg-gray-50' : 'hover:bg-gray-50' }}"
-                >
-                    <span class="text-end text-xs text-gray-400">{{ $loop->iteration }}</span>
-                    <button type="button" wire:click="selectBlock({{ $block['id'] }})" class="flex flex-1 items-center gap-2 py-1 text-start">
-                        <span class="text-sm {{ $isSelected ? 'font-semibold' : 'font-medium' }} {{ $block['is_visible'] ? 'text-gray-900' : 'text-gray-400' }}">
-                            {{ $definition?->label ?? $block['block_key'] }}
-                        </span>
-                        @unless ($block['is_visible'])
-                            <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Hidden</span>
-                        @endunless
-                        @if ($fieldErrors)
-                            <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">Needs attention</span>
-                        @endif
-                    </button>
-
-                    <button type="button" wire:click="toggleVisibility({{ $index }})" class="btn-ghost">
-                        {{ $block['is_visible'] ? 'Hide' : 'Show' }}
-                    </button>
-                    <button type="button" wire:sort:handle title="Drag to reorder" aria-label="Drag to reorder" class="btn-icon cursor-grab active:cursor-grabbing">
-                        <x-hugeicons-grip-vertical aria-hidden="true" />
-                    </button>
-                </div>
-            @empty
-                <p class="px-4 py-3 text-sm text-gray-500">This page has no blocks.</p>
-            @endforelse
-            </div>
+<form id="page-editor-form" data-unsaved-guard wire:submit="save" class="space-y-6">
+    <x-card>
+        <div class="grid gap-x-4 gap-y-5 sm:grid-cols-3">
+            <x-field label="Title" name="title" class="sm:col-span-2">
+                <input type="text" wire:model="title" class="input text-base font-medium">
+            </x-field>
+            <x-field label="Status" name="status">
+                <select wire:model="status" class="input">
+                    @foreach (\App\Models\PageStatus::options() as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </x-field>
         </div>
+    </x-card>
 
+    <div class="grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        {{-- Block list: pick one to edit, drag to reorder --}}
+        <x-card title="Blocks" :flush="true" class="lg:sticky lg:top-20">
+            <x-slot:actions>
+                <x-badge>{{ count($blocks) }}</x-badge>
+            </x-slot:actions>
+
+            <ol wire:sort="sortBlock" class="p-1.5">
+                @forelse ($blocks as $index => $block)
+                    @php
+                        $definition = $this->definitions->get($block['block_key']);
+                        $fieldErrors = collect($errors->keys())->contains(fn ($key) => str_starts_with($key, "blocks.$index."));
+                        $isSelected = $block['id'] === $selectedBlockId;
+                    @endphp
+                    <li
+                        wire:key="block-{{ $block['id'] }}"
+                        wire:sort:item="{{ $block['id'] }}"
+                        @class(['group flex items-center gap-1 rounded-lg ps-2', 'bg-muted' => $isSelected, 'hover:bg-muted/60' => ! $isSelected])
+                    >
+                        <span class="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{{ $loop->iteration }}</span>
+                        <button type="button" wire:click="selectBlock({{ $block['id'] }})" @if ($isSelected) aria-current="true" @endif class="flex min-w-0 flex-1 items-center gap-2 py-2 text-start">
+                            <span @class([
+                                'truncate text-sm',
+                                'font-semibold' => $isSelected,
+                                'font-medium' => ! $isSelected,
+                                'text-muted-foreground line-through decoration-muted-foreground/50' => ! $block['is_visible'],
+                            ])>{{ $definition?->label ?? $block['block_key'] }}</span>
+                            @if ($fieldErrors)
+                                <x-badge tone="danger">Fix</x-badge>
+                            @endif
+                        </button>
+                        <x-icon-button
+                            :icon="$block['is_visible'] ? 'view' : 'view-off'"
+                            :label="$block['is_visible'] ? 'Hide block' : 'Show block'"
+                            wire:click="toggleVisibility({{ $index }})"
+                            :class="$block['is_visible'] ? 'text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100' : 'text-muted-foreground'"
+                        />
+                        <x-icon-button icon="grip-vertical" label="Drag to reorder" wire:sort:handle class="cursor-grab text-muted-foreground active:cursor-grabbing" />
+                    </li>
+                @empty
+                    <li class="px-3 py-6 text-center text-sm text-secondary-foreground">This page has no blocks.</li>
+                @endforelse
+            </ol>
+        </x-card>
+
+        {{-- Selected block's fields --}}
         @foreach ($blocks as $index => $block)
             @if ($block['id'] === $selectedBlockId)
                 @php($definition = $this->definitions->get($block['block_key']))
-                <div wire:key="editor-{{ $block['id'] }}" class="rounded-lg border border-gray-200 bg-white flex-1">
-                    <div class="border-b border-gray-100 px-4 py-3">
-                        <h2 class="text-sm font-semibold text-gray-900">{{ $definition?->label ?? $block['block_key'] }}</h2>
-                    </div>
+                <x-card wire:key="editor-{{ $block['id'] }}" :title="$definition?->label ?? $block['block_key']" :description="$block['is_visible'] ? null : 'Hidden: the frontend doesn\'t receive this block.'">
+                    <x-slot:actions>
+                        <x-button variant="ghost" :icon="$block['is_visible'] ? 'view-off' : 'view'" wire:click="toggleVisibility({{ $index }})">
+                            {{ $block['is_visible'] ? 'Hide' : 'Show' }}
+                        </x-button>
+                    </x-slot:actions>
 
-                    <div class="space-y-4 px-4 py-4">
-                        @if ($definition === null)
-                            <p class="text-sm text-amber-700">No definition synced for block type "{{ $block['block_key'] }}", so its content can't be edited.</p>
-                        @endif
-
-                        @foreach ($definition?->fields() ?? [] as $field)
-                            <x-block-field :field="$field" path="blocks.{{ $index }}.content.{{ $field['name'] }}" :value="$block['content'][$field['name']] ?? []" wire:key="field-{{ $block['id'] }}-{{ $field['name'] }}" />
-                        @endforeach
-                    </div>
-                </div>
+                    @if ($definition === null)
+                        <x-callout tone="warning">No definition synced for block type "{{ $block['block_key'] }}", so its content can't be edited.</x-callout>
+                    @else
+                        <x-field-list :fields="$definition->fields()" :path="'blocks.'.$index.'.content'" :values="$block['content']" />
+                    @endif
+                </x-card>
             @endif
         @endforeach
     </div>

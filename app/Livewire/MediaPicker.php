@@ -8,6 +8,7 @@ use App\Models\Media;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Modelable;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -24,6 +25,13 @@ class MediaPicker extends Component
     public ?int $mediaId = null;
 
     public bool $open = false;
+
+    /**
+     * Show as a thumbnail tile (image repeater rows) instead of a row.
+     * Tiles leave removing to the row, so there is no clear button.
+     */
+    #[Locked]
+    public bool $tile = false;
 
     public $file = null;
 

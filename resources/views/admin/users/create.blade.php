@@ -10,64 +10,53 @@
 ])
 
 @section('content')
-    <form method="POST" action="{{ route('admin.users.store') }}" class="max-w-xl space-y-4 rounded-lg border p-4">
-        @csrf
+    <x-card class="max-w-xl">
+        <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-5">
+            @csrf
 
-        <label class="block text-sm font-medium">
-            Name <span class="text-red-600">*</span>
-            <input type="text" name="name" value="{{ old('name') }}" required maxlength="255" class="input mt-1">
-            @error('name') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
+            <div class="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                <x-field label="Name" name="name" required>
+                    <input type="text" name="name" value="{{ old('name') }}" required maxlength="255" class="input">
+                </x-field>
+                <x-field label="Email" name="email" required>
+                    <input type="email" name="email" value="{{ old('email') }}" required maxlength="255" class="input">
+                </x-field>
+            </div>
 
-        <label class="block text-sm font-medium">
-            Email <span class="text-red-600">*</span>
-            <input type="email" name="email" value="{{ old('email') }}" required maxlength="255" class="input mt-1">
-            @error('email') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-
-        <label class="block text-sm font-medium">
-            Access level
-            <select name="access_level" required class="input mt-1">
-                @foreach (\App\Models\AccessLevel::all() as $level)
-                    <option value="{{ $level }}" @selected(old('access_level', \App\Models\AccessLevel::CUSTOMER) === $level)>{{ \App\Models\AccessLevel::label($level) }}</option>
-                @endforeach
-            </select>
-            <span class="mt-1 block text-xs font-normal text-secondary-foreground">Customers only reach the sites they belong to. Admins reach every site and this admin area.</span>
-            @error('access_level') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-
-        <label class="block text-sm font-medium">
-            Password
-            <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to generate one" class="input mt-1">
-            <span class="mt-1 block text-xs font-normal text-secondary-foreground">A generated password is shown once after saving, so you can pass it on.</span>
-            @error('password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-            <label class="block text-sm font-medium">
-                Add to site
-                <select name="site_id" class="input mt-1">
-                    <option value="">None</option>
-                    @foreach ($sites as $site)
-                        <option value="{{ $site->id }}" @selected((int) old('site_id') === $site->id)>{{ $site->name }}</option>
+            <x-field label="Access level" name="access_level" hint="Customers only reach the sites they belong to. Admins reach every site and this admin area.">
+                <select name="access_level" required class="input">
+                    @foreach (\App\Models\AccessLevel::all() as $level)
+                        <option value="{{ $level }}" @selected(old('access_level', \App\Models\AccessLevel::CUSTOMER) === $level)>{{ \App\Models\AccessLevel::label($level) }}</option>
                     @endforeach
                 </select>
-                @error('site_id') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-            </label>
-            <label class="block text-sm font-medium">
-                Role on that site
-                <select name="role" class="input mt-1">
-                    @foreach (\App\Models\SiteRole::all() as $role)
-                        <option value="{{ $role }}" @selected(old('role', \App\Models\SiteRole::EDITOR) === $role)>{{ \App\Models\SiteRole::label($role) }}</option>
-                    @endforeach
-                </select>
-                @error('role') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-            </label>
-        </div>
+            </x-field>
 
-        <div class="flex items-center gap-3">
-            <button type="submit" class="btn">Create user</button>
-            <a href="{{ route('admin.users.index') }}" class="text-sm text-gray-600 hover:text-gray-900">Cancel</a>
-        </div>
-    </form>
+            <x-field label="Password" name="password" hint="A generated password is shown once after saving, so you can pass it on.">
+                <input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Leave blank to generate one" class="input">
+            </x-field>
+
+            <div class="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                <x-field label="Add to site" name="site_id">
+                    <select name="site_id" class="input">
+                        <option value="">None</option>
+                        @foreach ($sites as $site)
+                            <option value="{{ $site->id }}" @selected((int) old('site_id') === $site->id)>{{ $site->name }}</option>
+                        @endforeach
+                    </select>
+                </x-field>
+                <x-field label="Role on that site" name="role">
+                    <select name="role" class="input">
+                        @foreach (\App\Models\SiteRole::all() as $role)
+                            <option value="{{ $role }}" @selected(old('role', \App\Models\SiteRole::EDITOR) === $role)>{{ \App\Models\SiteRole::label($role) }}</option>
+                        @endforeach
+                    </select>
+                </x-field>
+            </div>
+
+            <div class="flex items-center gap-2 pt-1">
+                <x-button type="submit">Create user</x-button>
+                <x-button variant="subtle" :href="route('admin.users.index')">Cancel</x-button>
+            </div>
+        </form>
+    </x-card>
 @endsection

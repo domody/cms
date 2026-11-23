@@ -21,7 +21,7 @@
         </div>
         @if ($percent !== null)
             <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div class="h-full {{ $percent >= 90 ? 'bg-red-500' : 'bg-gray-900' }}" style="width: {{ $percent }}%"></div>
+                <div class="h-full {{ $percent >= 90 ? 'bg-danger' : 'bg-foreground' }}" style="width: {{ $percent }}%"></div>
             </div>
         @endif
     </div>
@@ -71,7 +71,7 @@
                         <summary class="btn-icon-ghost list-none" aria-label="Folder actions">
                             <x-hugeicons-more-vertical aria-hidden="true" />
                         </summary>
-                        <div class="absolute left-0 z-10 mt-1 w-40 rounded-lg border bg-white py-1 text-sm font-normal shadow-lg">
+                        <div class="absolute left-0 z-10 mt-1 w-40 rounded-lg bg-background p-1 text-sm font-normal shadow-lg ring-1 ring-border">
                             <x-media-folder-rename-modal :folder="$folder" />
                             <x-media-folder-delete-modal :folder="$folder" />
                         </div>
@@ -82,10 +82,10 @@
             <form method="GET" action="{{ route('media.index') }}" class="flex items-center gap-3 ms-auto" data-live-search-form>
                 @if ($folder) <input type="hidden" name="folder" value="{{ $folder->id }}"> @endif
                 <label class="flex items-center gap-1.5 whitespace-nowrap text-sm">
-                    <input type="checkbox" name="subfolders" value="1" @checked($subfolders)>
+                    <input type="checkbox" name="subfolders" value="1" @checked($subfolders) class="checkbox">
                     Include subfolders
                 </label>
-                <input type="search" name="q" value="{{ $search }}" maxlength="100" placeholder="Search name or alt text" class="input w-64">
+                <input type="search" name="q" value="{{ $search }}" maxlength="100" placeholder="Search name or alt text" class="input h-8 w-64 py-1">
             </form>
         </div>
 
@@ -93,7 +93,7 @@
             @if ($folders->isNotEmpty())
                 <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                     @foreach ($folders as $child)
-                        <a href="{{ route('media.index', ['folder' => $child->id]) }}" class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted">
+                        <a href="{{ route('media.index', ['folder' => $child->id]) }}" class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm ring-1 ring-border hover:bg-muted">
                             <x-hugeicons-folder-01 class="size-4 shrink-0" aria-hidden="true" />
                             <span class="truncate">{{ $child->name }}</span>
                             <span class="ml-auto text-xs text-secondary-foreground">{{ $child->media_count }}</span>
@@ -104,26 +104,26 @@
         @endif
 
         {{-- Bulk actions (the checkboxes below belong to this form) --}}
-        <form id="bulk-form" method="POST" class="hidden flex-wrap items-center gap-2 text-sm">
+        <form id="bulk-form" method="POST" class="hidden flex-wrap items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm">
             @csrf
             <span class="text-muted-foreground"><span data-selected-count>0</span> selected</span>
-            <select name="folder_id" class="input w-auto py-1">
+            <select name="folder_id" aria-label="Move to folder" class="input h-8 w-auto bg-background py-1">
                 <option value="">Library root</option>
                 @foreach ($folderPaths as $id => $path)
                     <option value="{{ $id }}">{{ $path }}</option>
                 @endforeach
             </select>
-            <button type="submit" formaction="{{ route('media.bulk-move') }}" class="btn-outline">Move selected</button>
+            <x-button type="submit" variant="outline" :formaction="route('media.bulk-move')">Move selected</x-button>
             @if ($canDelete)
-                <button type="submit" formaction="{{ route('media.bulk-delete') }}" data-confirm="Delete the selected images? Images that are in use are kept." class="btn-danger-outline">Delete selected</button>
+                <x-button type="submit" variant="danger-outline" :formaction="route('media.bulk-delete')" data-confirm="Delete the selected images? Images that are in use are kept.">Delete selected</x-button>
             @endif
-            @error('ids') <span class="text-xs text-red-600">Select at least one image.</span> @enderror
-            <button type="button" data-clear-selection class="ml-auto text-muted-foreground hover:underline">Clear</button>
+            @error('ids') <span class="text-xs font-medium text-danger">Select at least one image.</span> @enderror
+            <x-button variant="subtle" data-clear-selection class="ml-auto">Clear</x-button>
         </form>
 
         {{-- Media items --}}
         @if ($media->isEmpty())
-            <div class="rounded-lg border px-4 py-8 text-center text-sm text-secondary-foreground">
+            <x-empty-state icon="image-01">
                 @if ($search !== '')
                     No images match your search.
                 @elseif ($folders->isNotEmpty())
@@ -131,7 +131,7 @@
                 @else
                     No images here yet. Upload one above.
                 @endif
-            </div>
+            </x-empty-state>
         @else
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($media as $item)

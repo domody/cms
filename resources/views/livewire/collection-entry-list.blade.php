@@ -1,36 +1,36 @@
-<div class="rounded-lg border border-gray-200 bg-white">
+<div>
     @if ($this->entries->isEmpty())
-        <p class="px-4 py-8 text-center text-sm text-gray-500">
-            No entries yet. Use "Add entry" to create the first one.
-        </p>
+        <x-empty-state icon="folder-01" title="No entries yet">
+            Use "Add entry" to create the first one.
+        </x-empty-state>
     @else
-        <div wire:sort="sortEntry">
-            @foreach ($this->entries as $entry)
-                <div
-                    wire:key="entry-{{ $entry->id }}"
-                    wire:sort:item="{{ $entry->id }}"
-                    class="flex items-center gap-3 px-3 py-2 {{ $loop->last ? '' : 'border-b border-gray-100' }} hover:bg-gray-50"
-                >
-                    <button type="button" wire:sort:handle title="Drag to reorder" aria-label="Drag to reorder" class="btn-icon cursor-grab active:cursor-grabbing">
-                        <x-hugeicons-grip-vertical aria-hidden="true" />
-                    </button>
-                    <a href="{{ route('collections.edit', ['collection' => $this->definition->key, 'entry' => $entry]) }}" class="flex-1 py-1">
-                        <span class="text-sm font-medium text-gray-900">{{ $entry->title }}</span>
-                        <span class="ms-2 text-xs text-gray-500">/{{ $entry->slug }}</span>
-                    </a>
-                    {!! \App\Models\PageStatus::badge($entry->status) !!}
-                    @if ($this->canDelete)
-                    <button
-                        type="button"
-                        wire:click="delete({{ $entry->id }})"
-                        wire:confirm="Delete &quot;{{ $entry->title }}&quot;? This can't be undone."
-                        class="btn-ghost-danger"
+        <x-card :flush="true">
+            <ol wire:sort="sortEntry" class="divide-y">
+                @foreach ($this->entries as $entry)
+                    <li
+                        wire:key="entry-{{ $entry->id }}"
+                        wire:sort:item="{{ $entry->id }}"
+                        class="group flex items-center gap-3 py-1 pe-2 ps-1.5 hover:bg-muted/60"
                     >
-                        Delete
-                    </button>
-                    @endif
-                </div>
-            @endforeach
-        </div>
+                        <x-icon-button icon="grip-vertical" label="Drag to reorder" wire:sort:handle class="cursor-grab text-muted-foreground active:cursor-grabbing" />
+                        <a href="{{ route('collections.edit', ['collection' => $this->definition->key, 'entry' => $entry]) }}" class="flex min-w-0 flex-1 items-baseline gap-2 py-2">
+                            <span class="truncate text-sm font-medium">{{ $entry->title }}</span>
+                            <span class="truncate font-mono text-xs text-muted-foreground">/{{ $entry->slug }}</span>
+                        </a>
+                        {!! \App\Models\PageStatus::badge($entry->status) !!}
+                        @if ($this->canDelete)
+                            <x-icon-button
+                                icon="delete-02"
+                                :label="'Delete '.$entry->title"
+                                tone="danger"
+                                wire:click="delete({{ $entry->id }})"
+                                wire:confirm="Delete &quot;{{ $entry->title }}&quot;? This can't be undone."
+                                class="text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
+                            />
+                        @endif
+                    </li>
+                @endforeach
+            </ol>
+        </x-card>
     @endif
 </div>

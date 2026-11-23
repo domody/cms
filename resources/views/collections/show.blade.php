@@ -9,10 +9,7 @@
 ])
 
 @section('pageActions')
-    <a href="{{ route('collections.create', ['collection' => $collection->key]) }}" class="btn">
-        <x-hugeicons-add-01 aria-hidden="true" />
-        Add entry
-    </a>
+    <x-button icon="add-01" :href="route('collections.create', ['collection' => $collection->key])">Add entry</x-button>
 @endsection
 
 @section('content')

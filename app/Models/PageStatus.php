@@ -72,7 +72,7 @@ class PageStatus
     public static function badge(string $status): string
     {
         return sprintf(
-            '<span class="rounded-full px-2 py-0.5 text-xs font-medium %s">%s</span>',
+            '<span class="badge %s">%s</span>',
             self::getClass($status),
             self::label($status),
         );

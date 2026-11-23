@@ -8,29 +8,25 @@
 ])
 
 @section('pageActions')
-    <a href="{{ route('home') }}" class="text-sm text-gray-600 hover:text-gray-900">Back to the CMS</a>
+    <x-button variant="subtle" icon="arrow-left-01" :href="route('home')">Back to the CMS</x-button>
 @endsection
 
 @section('content')
-    <form method="POST" action="{{ route('account.update') }}" class="max-w-md space-y-4 rounded-lg border p-4">
-        @csrf
-        <h2 class="text-sm font-semibold">Change password</h2>
+    <x-card title="Change password" class="max-w-md">
+        <form method="POST" action="{{ route('account.update') }}" class="space-y-5">
+            @csrf
 
-        <label class="block text-sm font-medium">
-            Current password
-            <input type="password" name="current_password" required autocomplete="current-password" class="input mt-1">
-            @error('current_password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-        <label class="block text-sm font-medium">
-            New password
-            <input type="password" name="password" required minlength="8" autocomplete="new-password" class="input mt-1">
-            @error('password') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-        </label>
-        <label class="block text-sm font-medium">
-            Confirm new password
-            <input type="password" name="password_confirmation" required autocomplete="new-password" class="input mt-1">
-        </label>
+            <x-field label="Current password" name="current_password">
+                <input type="password" name="current_password" required autocomplete="current-password" class="input">
+            </x-field>
+            <x-field label="New password" name="password">
+                <input type="password" name="password" required minlength="8" autocomplete="new-password" class="input">
+            </x-field>
+            <x-field label="Confirm new password" name="password_confirmation">
+                <input type="password" name="password_confirmation" required autocomplete="new-password" class="input">
+            </x-field>
 
-        <button type="submit" class="btn">Update password</button>
-    </form>
+            <x-button type="submit">Update password</x-button>
+        </form>
+    </x-card>
 @endsection

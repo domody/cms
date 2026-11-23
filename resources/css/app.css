@@ -13,6 +13,8 @@
     --background: oklch(1 0 0);
     --card: oklch(1 0 0);
     --muted: oklch(0.9821 0 0);
+    /* Filled form controls: a tint instead of an outline keeps dense forms quiet. */
+    --input: oklch(0.9702 0.0015 286.38);
 
     /* Text */
     --foreground: oklch(0.2055 0.0039 286.05);
@@ -69,6 +71,7 @@
     --color-background: var(--background);
     --color-card: var(--card);
     --color-muted: var(--muted);
+    --color-input: var(--input);
 
     --color-foreground: var(--foreground);
     --color-muted-foreground: var(--muted-foreground);
@@ -107,12 +110,47 @@
 /* Shared form controls. Layout (margins, widths) stays on the element; utilities there override these. */
 @layer components {
   .input {
-    @apply block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring;
+    @apply block w-full rounded-lg border border-transparent bg-input px-3 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground hover:border-border focus:border-foreground/25 focus:bg-background focus:outline-none focus:ring-3 focus:ring-ring/60 aria-invalid:border-danger/50 aria-invalid:bg-danger/5;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+
+  /* Tables: the wrapper (x-table) draws the one outline; rows only get hairlines. */
+  .data-table {
+    @apply min-w-full text-sm;
+  }
+
+  .data-table thead th {
+    @apply border-b px-4 py-2.5 text-left text-xs font-medium text-secondary-foreground;
+  }
+
+  .data-table tbody td {
+    @apply px-4 py-3 align-middle;
+  }
+
+  /* Line the outer columns up with x-card's px-5 header. */
+  .data-table :is(th, td):first-child {
+    @apply ps-5;
+  }
+
+  .data-table :is(th, td):last-child {
+    @apply pe-5;
+  }
+
+  .data-table tbody tr + tr td {
+    @apply border-t;
+  }
+
+  .data-table tbody td.empty {
+    @apply py-10 text-center text-secondary-foreground;
   }
 
   /* shadcn button base (light only). Variants below only set colours; .btn-icon swaps the padded size for size-8. */
   .btn,
   .btn-outline,
+  .btn-subtle,
   .btn-danger,
   .btn-danger-outline,
   .btn-icon {
@@ -121,6 +159,7 @@
 
   .btn,
   .btn-outline,
+  .btn-subtle,
   .btn-danger,
   .btn-danger-outline {
     @apply h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2;
@@ -132,6 +171,11 @@
 
   .btn {
     @apply border-transparent bg-primary text-white hover:bg-primary/75 hover:text-white;
+  }
+
+  /* Secondary navigation-style actions (History, Cancel, Back): no chrome until hovered. */
+  .btn-subtle {
+    @apply border-transparent bg-transparent text-secondary-foreground;
   }
 
   .btn-danger {

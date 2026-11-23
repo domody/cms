@@ -26,7 +26,7 @@
                         type="button"
                         data-sidebar-group-toggle
                         aria-expanded="{{ $groupIsActive ? 'true' : 'false' }}"
-                        class="flex w-full items-center justify-between rounded px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white"
+                        class="sidebar-link w-full justify-between"
                     >
                         <span class="flex items-center gap-2">
                             @isset($item['icon'])
@@ -34,13 +34,13 @@
                             @endisset
                             {{ $item['text'] }}
                         </span>
-                        <span data-sidebar-group-indicator class="shrink-0 text-xs text-gray-400" aria-hidden="true">{{ $groupIsActive ? '−' : '+' }}</span>
+                        <span data-sidebar-group-indicator class="shrink-0 text-xs text-muted-foreground" aria-hidden="true">{{ $groupIsActive ? '−' : '+' }}</span>
                     </button>
                     <div data-sidebar-group-panel class="ps-3 space-y-1 {{ $groupIsActive ? '' : 'hidden' }}">
                         @foreach ($item['links'] as $link)
                             <a
                                 href="{{ $link['url'] }}"
-                                class="flex items-center gap-2 rounded px-3 py-2 text-sm font-medium {{ request()->routeIs($link['route']) ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}"
+                                class="sidebar-link" @if (request()->routeIs($link['route'])) aria-current="page" @endif
                             >
                                 @isset($link['icon'])
                                     <x-dynamic-component :component="$link['icon']" class="size-5 shrink-0" aria-hidden="true" />

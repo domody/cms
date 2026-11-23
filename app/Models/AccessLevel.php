@@ -64,7 +64,7 @@ class AccessLevel
     public static function badge(string $accessLevel): string
     {
         return sprintf(
-            '<span class="rounded-full px-2 py-0.5 text-xs font-medium %s">%s</span>',
+            '<span class="badge %s">%s</span>',
             self::getClass($accessLevel),
             self::label($accessLevel),
         );

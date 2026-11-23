@@ -5,20 +5,15 @@
     'breadcrumbs' => [
         ['label' => 'Collections', 'route' => route('collections.index')],
         ['label' => $collection->label, 'route' => route('collections.show', ['collection' => $collection->key])],
-        ['label' => $entry ? 'Edit' : 'New'],
+        ['label' => $entry ? $entry->title : 'New entry'],
     ],
 ])
 
 @section('pageActions')
-    <div class="flex items-center gap-3">
-        @if ($entry)
-            <a href="{{ route('history.index', ['type' => 'collection_entry', 'subject' => $entry->id]) }}" class="text-sm text-gray-600 hover:text-gray-900">History</a>
-        @endif
-        <a href="{{ route('collections.show', ['collection' => $collection->key]) }}" class="text-sm text-gray-600 hover:text-gray-900">Back to list</a>
-        <button type="submit" form="entry-editor-form" class="btn">
-            Save entry
-        </button>
-    </div>
+    @if ($entry)
+        <x-button variant="subtle" icon="clock-01" :href="route('history.index', ['type' => 'collection_entry', 'subject' => $entry->id])">History</x-button>
+    @endif
+    <x-button type="submit" form="entry-editor-form">Save entry</x-button>
 @endsection
 
 @section('content')
@@ -27,4 +22,5 @@
 
 @push('scripts')
     <script src="{{ asset('js/livewire.unsaved-guard.js') }}"></script>
+    <script src="{{ asset('js/collections.form.js') }}"></script>
 @endpush

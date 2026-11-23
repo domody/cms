@@ -1,8 +1,7 @@
 @extends('layouts.admin', [
     'title' => $page->title,
     'pageTitle' => $page->title,
-    'pageDescription' => '/'.$page->slug.' · '.\App\Models\PageStatus::label($page->status)
-        .($page->status !== \App\Models\PageStatus::PUBLISHED ? ' (not served by the API until published)' : ''),
+    'pageDescription' => '/'.$page->slug,
     'breadcrumbs' => [
         ['label' => 'Pages', 'route' => route('pages.index')],
         ['label' => $page->title],
@@ -10,40 +9,44 @@
 ])
 
 @section('pageActions')
-    <a href="{{ route('pages.edit', $page) }}" class="btn">Edit</a>
+    <x-button icon="edit-02" :href="route('pages.edit', $page)">Edit</x-button>
 @endsection
 
 @section('content')
-    <div class="space-y-3">
+    <div class="max-w-4xl space-y-4">
+        @if ($page->status !== \App\Models\PageStatus::PUBLISHED)
+            <x-callout tone="warning">This page is {{ strtolower(\App\Models\PageStatus::label($page->status)) }}, so the API doesn't serve it until it is published.</x-callout>
+        @endif
+
         @forelse ($page->blocks as $block)
             @php $definition = $definitions->get($block->block_key); @endphp
-            <section class="rounded-lg border bg-white {{ $block->is_visible ? 'border-gray-200' : 'border-dashed border-gray-300 opacity-60' }}">
-                <header class="flex items-center justify-between border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
-                    <span class="font-medium uppercase tracking-wide">
-                        {{ $loop->iteration }}. {{ $definition?->label ?? $block->block_key }}
-                        <code class="ms-1 normal-case text-gray-400">{{ $block->block_key }}</code>
-                    </span>
-                    <span>
-                        @unless ($block->is_visible) Hidden &middot; @endunless
-                        schema v{{ $block->schema_version }}
-                    </span>
-                </header>
-                <div class="space-y-3 px-4 py-4">
+            <x-card
+                :title="$loop->iteration.'. '.($definition?->label ?? $block->block_key)"
+                :class="$block->is_visible ? '' : 'opacity-60'"
+            >
+                <x-slot:actions>
+                    @unless ($block->is_visible)
+                        <x-badge>Hidden</x-badge>
+                    @endunless
+                    <code class="text-xs text-muted-foreground">{{ $block->block_key }} · v{{ $block->schema_version }}</code>
+                </x-slot:actions>
+
+                <div class="space-y-4">
                     @if ($definition === null)
-                        <p class="text-sm text-amber-700">No definition synced for this block type.</p>
+                        <x-callout tone="warning">No definition synced for this block type.</x-callout>
                     @endif
                     @foreach ($definition?->fields() ?? [] as $field)
                         <x-block-preview :field="$field" :value="$field['collection'] ?? ($block->content[$field['name']] ?? null)" />
                     @endforeach
                 </div>
-            </section>
+            </x-card>
         @empty
-            <p class="text-sm text-gray-500">This page has no blocks.</p>
+            <x-empty-state icon="file-01">This page has no blocks.</x-empty-state>
         @endforelse
-    </div>
 
-    <details class="mt-6 rounded-lg border border-gray-200 bg-white">
-        <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">API response (what the frontend receives)</summary>
-        <pre class="overflow-x-auto border-t border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-800">{{ json_encode(['data' => $apiPayload], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
-    </details>
+        <details class="rounded-xl ring-1 ring-border">
+            <summary class="cursor-pointer px-5 py-3 text-sm font-medium">API response <span class="font-normal text-secondary-foreground">(what the frontend receives)</span></summary>
+            <pre class="overflow-x-auto border-t bg-muted px-5 py-4 text-xs">{{ json_encode(['data' => $apiPayload], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) }}</pre>
+        </details>
+    </div>
 @endsection
